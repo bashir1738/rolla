@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  /* Rolla brand palette (mirrors mobile/constants/theme.ts) */
+  --color-primary: #1a3c2b; /* Forest Green */
+  --color-primary-700: #16331f;
+  --color-surface: #faf6ee; /* Warm Cream */
+  --color-accent: #d4a017; /* Warm Gold */
+  --color-alert: #c1440e; /* Terracotta */
+  --color-sage: #8fa98c; /* Warm Sage */
+  --color-charcoal: #1c1c1e; /* Deep Charcoal */
+  --color-border: #d9e8e0;
+  --color-muted: #6b7c74;
+
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-4xl: 2rem;
+
+  /* Wider page container */
+  --container-8xl: 90rem;
+
+  /* Extra spacing steps used by the display components */
+  --spacing-13: 3.25rem;
+  --spacing-18: 4.5rem;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #1c1c1e;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle entrance used across display sections */
+@keyframes rolla-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rolla-rise {
+  animation: rolla-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

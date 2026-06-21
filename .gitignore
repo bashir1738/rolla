@@ -1,0 +1,29 @@
+# Root safety net for the monorepo. Each package (contract/, mobile/, frontend/)
+# has its own .gitignore; this guards secrets at every level.
+
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Wallet / key material — never commit
+*.pem
+*.key
+*.keystore
+*.p12
+*.mnemonic
+secrets.json
+**/secrets/
+
+# --- Dependencies / build output ---
+node_modules/
+.next/
+dist/
+build/
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.log
