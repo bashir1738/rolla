@@ -13,8 +13,8 @@ export function CTA() {
             Make it count.
           </h2>
           <p className="mx-auto mt-5 max-w-md text-lg leading-8 text-muted">
-            Start a circle in minutes, or earn yield on what you already hold.
-            It&apos;s your money, on your terms.
+            Start a circle in minutes, or let what you&apos;ve already saved grow
+            a little. It&apos;s your money, on your terms.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -23,12 +23,12 @@ export function CTA() {
               <ArrowRightIcon className="h-4 w-4" />
             </GetAppButton>
             <Button href="#how" variant="secondary" className="h-13 px-8">
-              Read the docs
+              See how it works
             </Button>
           </div>
 
           <p className="mt-6 text-xs text-muted">
-            Free to start · Non-custodial · No hidden fees
+            Free to start · Your money stays yours · No hidden fees
           </p>
         </div>
       </Container>

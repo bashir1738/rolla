@@ -5,20 +5,20 @@ const STEPS = [
   {
     icon: WalletIcon,
     step: "01",
-    title: "Connect your wallet",
-    body: "Sign in with any wallet to get started. You stay in full custody of your funds — Rolla never holds your keys.",
+    title: "Sign in",
+    body: "Get started in moments with your wallet. Your money stays in your hands the whole time.",
   },
   {
     icon: CircleUsersIcon,
     step: "02",
-    title: "Create or join a circle",
-    body: "Set the amount, schedule, and members — or join one you're invited to. The rules are locked in onchain from day one.",
+    title: "Start or join a circle",
+    body: "Pick the amount, the schedule, and who's in — or join one you've been invited to. Everyone agrees on the rules from day one.",
   },
   {
     icon: GiftIcon,
     step: "03",
-    title: "Contribute & get paid",
-    body: "Everyone pays in each round, and members receive the pot in turn. Idle funds earn yield until it's your time.",
+    title: "Save & get paid",
+    body: "Everyone pays in each round, and members get the full pot in turn. While you wait, your money earns a little extra.",
   },
 ];
 

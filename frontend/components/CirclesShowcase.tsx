@@ -2,9 +2,9 @@ import { Container, Section, SectionHeading, Pill } from "./ui";
 import { CircleUsersIcon, GiftIcon, CheckIcon } from "./icons";
 
 const POINTS = [
-  "Invite people you trust — set the amount and schedule.",
-  "Everyone contributes each round, automatically.",
-  "One member receives the full pot, in turn, until all are paid.",
+  "Invite people you trust — agree on the amount and schedule.",
+  "Everyone chips in each round, automatically.",
+  "One member gets the full pot each round, taking turns until everyone's been paid.",
 ];
 
 export function CirclesShowcase() {
@@ -85,8 +85,8 @@ export function CirclesShowcase() {
         <div className="order-1 lg:order-2">
           <SectionHeading
             eyebrow="Savings Circles"
-            title="The ajo you grew up with — now fair by design."
-            description="A rotating savings circle (ajo, esusu, tontine) where members pool a fixed amount each round and take turns receiving the pot. Rolla runs the rules onchain, so no one skips, no one disappears, and every payout is provable."
+            title="The ajo you grew up with — now fair for everyone."
+            description="It's the savings circle you already know — ajo, esusu, tontine. Everyone chips in the same amount each round, and members take turns getting the full pot. Rolla keeps everyone honest, so no one skips a payment or disappears, and every payout is there for the group to see."
           />
 
           <ul className="mt-9 space-y-5">

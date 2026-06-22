@@ -1,10 +1,10 @@
 import { Container } from "./ui";
 
 const STATS = [
-  { value: "14.8%", label: "Max APR on idle savings" },
+  { value: "14.8%", label: "Growth on savings waiting their turn" },
   { value: "$0", label: "Hidden fees, ever" },
-  { value: "100%", label: "Onchain & transparent" },
-  { value: "24/7", label: "Withdraw on your terms" },
+  { value: "100%", label: "Open and transparent" },
+  { value: "24/7", label: "Take your money out anytime" },
 ];
 
 export function Stats() {

@@ -7,9 +7,9 @@ const TIERS = [
     apr: "8.5%",
     icon: SparkIcon,
     lock: "No lock-up",
-    min: "Min 10 USDT",
-    blurb: "Stay liquid. Earn yield while keeping instant access to your funds.",
-    perks: ["Withdraw anytime", "Daily accrual", "Perfect for circle buffers"],
+    min: "From $10",
+    blurb: "Keep it flexible. Earn a little extra while you keep instant access to your money.",
+    perks: ["Take it out anytime", "Grows every day", "Great for spare cash"],
     popular: false,
   },
   {
@@ -17,9 +17,9 @@ const TIERS = [
     apr: "11.2%",
     icon: BoltIcon,
     lock: "90-day lock",
-    min: "Min 100 USDT",
-    blurb: "A balanced tier for savers who can commit for a season.",
-    perks: ["Higher APR", "Auto-compounding", "Goal-based saving"],
+    min: "From $100",
+    blurb: "A nice middle ground for savers who can set money aside for a season.",
+    perks: ["Earns more", "Grows on itself", "Great for a savings goal"],
     popular: true,
   },
   {
@@ -27,9 +27,9 @@ const TIERS = [
     apr: "14.8%",
     icon: LockIcon,
     lock: "365-day lock",
-    min: "Min 500 USDT",
-    blurb: "Maximum yield for long-term savers building real wealth.",
-    perks: ["Top APR", "Priority payouts", "Compound for a full year"],
+    min: "From $500",
+    blurb: "The most growth for savers who are in it for the long haul.",
+    perks: ["Earns the most", "Priority payouts", "Grows all year long"],
     popular: false,
   },
 ];
@@ -41,8 +41,8 @@ export function VaultTiers() {
         <SectionHeading
           align="center"
           eyebrow="Save & Earn"
-          title="Put idle savings to work."
-          description="Deposit any token — it's converted to USDT and supplied to Aave V3, where yield accrues automatically. Choose the tier that matches your timeline."
+          title="Let your savings grow while they wait."
+          description="Money that's waiting its turn can earn a little extra in the meantime. Pick the option that matches how long you're happy to leave it."
         />
 
         <div className="mt-16 grid gap-6 lg:grid-cols-3">
@@ -137,7 +137,7 @@ export function VaultTiers() {
                     variant={featured ? "secondary" : "primary"}
                     className="w-full"
                   >
-                    Deposit into {t.name}
+                    Start with {t.name}
                   </Button>
                 </div>
               </div>
@@ -146,8 +146,8 @@ export function VaultTiers() {
         </div>
 
         <p className="mt-10 text-center text-xs text-muted">
-          APRs are illustrative and vary with market conditions. Yield is sourced
-          from Aave V3 on Ethereum.
+          Rates shown are examples and can go up or down over time. Your savings
+          are never locked away from you for longer than the term you pick.
         </p>
       </Container>
     </Section>

@@ -16,33 +16,33 @@ const FEATURES: {
 }[] = [
   {
     icon: ShieldIcon,
-    title: "Trust, enforced by code",
-    body: "Contributions and payouts follow rules locked into a smart contract. No defaults, no favoritism — just the agreement everyone signed up for.",
+    title: "Everyone plays fair",
+    body: "The amount, the schedule, and whose turn is next are all agreed up front — and can't be changed. No skipped payments, no favorites, ever.",
   },
   {
     icon: TrendingUpIcon,
-    title: "Yield on idle savings",
-    body: "Funds waiting for their turn don't sit still. Route them into vaults earning real yield, then pull out when it's your round.",
+    title: "Your savings keep growing",
+    body: "Money waiting for its turn doesn't just sit there. It quietly earns a little extra until your round comes around.",
   },
   {
     icon: WalletIcon,
-    title: "Deposit any token",
-    body: "Pay in with what you hold. Rolla converts to a stable USDT base under the hood so circles stay simple and steady.",
+    title: "Pay with what you have",
+    body: "Chip in with whatever you've got. Rolla takes care of the rest behind the scenes, so every circle stays simple.",
   },
   {
     icon: GlobeIcon,
-    title: "For the diaspora",
-    body: "Save across borders with family and friends. No bank branch, no wire fees — just a shared circle that works from anywhere.",
+    title: "Save from anywhere",
+    body: "Save with family and friends across borders. No bank branch, no transfer fees — just a shared circle that works from anywhere.",
   },
   {
     icon: GiftIcon,
     title: "Payouts you can see",
-    body: "Every round, every claim, every member's turn is visible and verifiable. The pot is always exactly where it should be.",
+    body: "Every round, every payout, and whose turn is next is right there for the whole group to see. The pot is always exactly where it should be.",
   },
   {
     icon: BoltIcon,
-    title: "Built on Ethereum",
-    body: "Settled onchain for transparency and self-custody. Your savings belong to you — Rolla never holds the keys.",
+    title: "Truly yours",
+    body: "Your savings always belong to you. Rolla can't touch them, hold them, or lock you out — not now, not ever.",
   },
 ];
 
@@ -53,8 +53,8 @@ export function Features() {
         <SectionHeading
           align="center"
           eyebrow="Why Rolla"
-          title="Old tradition. New guarantees."
-          description="Everything you love about community savings, with the safety and transparency of an open ledger."
+          title="Old tradition. New peace of mind."
+          description="Everything you love about saving with your community — now safer, clearer, and easier to trust."
         />
 
         <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

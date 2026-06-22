@@ -21,7 +21,7 @@ export function Hero() {
       <Container className="grid items-center gap-16 py-20 lg:grid-cols-2 lg:gap-12 lg:py-28">
         {/* Copy */}
         <div className="rolla-rise max-w-xl">
-          <Pill tone="accent">Ajo &amp; Esusu, reimagined onchain</Pill>
+          <Pill tone="accent">Ajo &amp; Esusu, made simple</Pill>
 
           <h1 className="mt-6 text-4xl font-extrabold leading-[1.08] tracking-tight text-charcoal sm:text-5xl lg:text-6xl">
             Save together,
@@ -30,9 +30,9 @@ export function Hero() {
           </h1>
 
           <p className="mt-6 max-w-md text-lg leading-8 text-muted">
-            Rolla turns rotating savings circles into something you can trust —
-            transparent, automated, and onchain. Save with your community and
-            grow idle funds with built-in yield.
+            Rolla makes the savings circles you grew up with safer and simpler.
+            Save with people you trust, see every payout happen on time, and let
+            your money grow a little while you wait your turn.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
