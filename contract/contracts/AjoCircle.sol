@@ -17,6 +17,7 @@ contract AjoCircle is ReentrancyGuard {
     address public immutable USDT;
     address public immutable UNISWAP_ROUTER;
     address public immutable WETH;
+    address public immutable owner;
 
     // ─── Types ──────────────────────────────────────────────────────────────
     enum CircleStatus {
@@ -37,10 +38,9 @@ contract AjoCircle is ReentrancyGuard {
         uint256 frequency;          // seconds between rounds
         CircleStatus status;
         bool payoutPending;         // true once all have paid; false after claim
-        uint8 paidCount;
+        uint256 paidCount;          // uint256 avoids truncation vs maxMembers
         mapping(address => bool) hasPaidThisRound;
         mapping(address => uint256) payoutPosition; // 1-indexed join order
-        mapping(address => bytes32) pushTokenHash;  // off-chain notification token
     }
 
     // ─── Storage ─────────────────────────────────────────────────────────────
@@ -71,6 +71,7 @@ contract AjoCircle is ReentrancyGuard {
         USDT = _usdt;
         UNISWAP_ROUTER = _router;
         WETH = _weth;
+        owner = msg.sender;
     }
 
     // ─── External: Create ────────────────────────────────────────────────────
@@ -137,6 +138,11 @@ contract AjoCircle is ReentrancyGuard {
         uint256 amountOutMinimum,
         uint24 poolFee
     ) external payable nonReentrant {
+        // Reject accidental ETH on non-native paths
+        if (tokenIn != address(0)) {
+            require(msg.value == 0, "ETH not accepted for ERC20 path");
+        }
+
         Circle storage c = circles[circleId];
         require(c.status == CircleStatus.Active, "Circle not active");
         require(!c.payoutPending, "Awaiting payout claim");
@@ -157,7 +163,7 @@ contract AjoCircle is ReentrancyGuard {
 
         emit ContributionMade(circleId, msg.sender, c.contributionAmount, c.currentRound);
 
-        if (c.paidCount == uint8(c.maxMembers)) {
+        if (c.paidCount == c.maxMembers) {
             _triggerPayout(circleId);
         }
     }
@@ -165,7 +171,7 @@ contract AjoCircle is ReentrancyGuard {
     // ─── External: Claim Payout ──────────────────────────────────────────────
 
     /// @notice Current round's recipient claims the pot.
-    ///         tokenOut == address(0) returns USDT; any other address swaps to that token.
+    ///         tokenOut == USDT returns USDT directly; any other address swaps to that token.
     function claimPayout(
         uint256 circleId,
         address tokenOut,
@@ -215,7 +221,7 @@ contract AjoCircle is ReentrancyGuard {
             uint256 frequency,
             CircleStatus status,
             bool payoutPending,
-            uint8 paidCount
+            uint256 paidCount
         )
     {
         Circle storage c = circles[circleId];
@@ -259,6 +265,17 @@ contract AjoCircle is ReentrancyGuard {
         return circles[circleId].members.length;
     }
 
+    // ─── Admin ───────────────────────────────────────────────────────────────
+
+    /// @notice Rescue ETH accidentally sent directly to the contract.
+    function rescueETH() external {
+        require(msg.sender == owner, "Not owner");
+        uint256 bal = address(this).balance;
+        require(bal > 0, "No ETH");
+        (bool ok, ) = owner.call{value: bal}("");
+        require(ok, "ETH rescue failed");
+    }
+
     // ─── Internal ────────────────────────────────────────────────────────────
 
     function _triggerPayout(uint256 circleId) internal {
@@ -275,8 +292,6 @@ contract AjoCircle is ReentrancyGuard {
     }
 
     /// @dev Pulls tokenIn from msg.sender and returns the USDT amount received.
-    ///      If tokenIn == address(0), treats msg.value as native ETH routed through WETH.
-    ///      If tokenIn == USDT, no swap occurs.
     function _pullAndSwapToUSDT(
         address tokenIn,
         uint256 amountIn,
@@ -291,7 +306,6 @@ contract AjoCircle is ReentrancyGuard {
         ISwapRouter.ExactInputSingleParams memory params;
 
         if (tokenIn == address(0)) {
-            // Native ETH: router accepts it with tokenIn = WETH and msg.value
             require(msg.value == amountIn, "ETH amount mismatch");
             params = ISwapRouter.ExactInputSingleParams({
                 tokenIn: WETH,
@@ -305,7 +319,6 @@ contract AjoCircle is ReentrancyGuard {
             });
             usdtReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle{value: amountIn}(params);
         } else {
-            // ERC20 token
             _safeTransferFrom(tokenIn, msg.sender, address(this), amountIn);
             _safeApprove(tokenIn, UNISWAP_ROUTER, amountIn);
             params = ISwapRouter.ExactInputSingleParams({
@@ -322,10 +335,6 @@ contract AjoCircle is ReentrancyGuard {
         }
     }
 
-    /// @dev Sends usdtAmount to recipient, swapping to tokenOut if requested.
-    ///      tokenOut == USDT  → direct transfer.
-    ///      tokenOut == address(0) → swap to WETH then unwrap to native ETH.
-    ///      other address → swap to that ERC20.
     function _swapUSDTAndSend(
         address tokenOut,
         uint256 usdtAmount,
@@ -340,7 +349,6 @@ contract AjoCircle is ReentrancyGuard {
 
         bool wantNativeETH = (tokenOut == address(0));
         address effectiveOut = wantNativeETH ? WETH : tokenOut;
-        // Swap recipient: if ETH out, receive WETH here first, then unwrap
         address swapRecipient = wantNativeETH ? address(this) : recipient;
 
         _safeApprove(USDT, UNISWAP_ROUTER, usdtAmount);
@@ -364,7 +372,6 @@ contract AjoCircle is ReentrancyGuard {
     }
 
     // ─── Safe Token Helpers ──────────────────────────────────────────────────
-    // Handles tokens like USDT that don't return a bool from transfer/approve.
 
     function _safeTransfer(address token, address to, uint256 amount) internal {
         (bool ok, bytes memory data) = token.call(
@@ -380,7 +387,6 @@ contract AjoCircle is ReentrancyGuard {
         require(ok && (data.length == 0 || abi.decode(data, (bool))), "TransferFrom failed");
     }
 
-    /// @dev Resets allowance to 0 first (required by USDT on many chains).
     function _safeApprove(address token, address spender, uint256 amount) internal {
         (bool ok0, ) = token.call(abi.encodeWithSelector(0x095ea7b3, spender, 0));
         require(ok0, "Approve reset failed");

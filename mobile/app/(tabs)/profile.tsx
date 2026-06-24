@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Switch, Alert,
   TextInput, ActivityIndicator,
@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSignMessage } from 'wagmi';
+import { useFocusEffect } from 'expo-router';
 import { useWallet } from '../../providers/WalletContext';
 import { useDisplayName, fmtAddr } from '../../hooks/useDisplayName';
 import { usePin } from '../../hooks/usePin';
@@ -116,7 +117,11 @@ function NameEditor({ currentName, save, onDone }: {
 
 export default function ProfileTab() {
   const { address, isConnected, disconnect, connect } = useWallet();
-  const { display, name, save, clear } = useDisplayName(address);
+  const { display, name, save, clear, refetch } = useDisplayName(address);
+
+  // Re-read the name from storage every time this tab gains focus so changes
+  // saved in onboarding (or elsewhere) are always reflected immediately.
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
   const {
     hasPin, biometricEnabled, biometricType, biometricLabel,
     enableBiometric, disableBiometric,
@@ -154,8 +159,8 @@ export default function ProfileTab() {
   };
 
   const confirmDisconnect = () => Alert.alert(
-    'Disconnect wallet', 'Are you sure?',
-    [{ text: 'Cancel', style: 'cancel' }, { text: 'Disconnect', style: 'destructive', onPress: disconnect }],
+    'Sign out', 'You can sign back in anytime with the same social account.',
+    [{ text: 'Cancel', style: 'cancel' }, { text: 'Sign out', style: 'destructive', onPress: disconnect }],
   );
 
   const confirmClear = () => Alert.alert(
@@ -171,12 +176,12 @@ export default function ProfileTab() {
           <View className="w-20 h-20 rounded-full bg-primary/10 items-center justify-center">
             <Ionicons name="person-outline" size={36} color="#1A3C2B" />
           </View>
-          <Text className="text-charcoal text-xl font-black text-center">No wallet connected</Text>
+          <Text className="text-charcoal text-xl font-black text-center">You're signed out</Text>
           <Text className="text-muted text-sm text-center leading-relaxed">
-            Connect your wallet to see your profile and manage settings.
+            Sign in with your social account to see your profile and manage settings.
           </Text>
           <TouchableOpacity className="bg-primary rounded-full px-8 py-3.5 mt-2" onPress={connect}>
-            <Text className="text-white font-bold">Connect Wallet</Text>
+            <Text className="text-white font-bold">Sign in</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -185,7 +190,7 @@ export default function ProfileTab() {
 
   return (
     <SafeAreaView className="flex-1 bg-primary" edges={['top']}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <ScrollView className="flex-1 bg-surface" contentContainerClassName="pb-12" showsVerticalScrollIndicator={false}>
 
         {/* Hero */}
@@ -255,7 +260,7 @@ export default function ProfileTab() {
               icon="log-out-outline"
               iconBg="rgba(193,68,14,0.10)"
               iconColor="#C1440E"
-              label="Disconnect Wallet"
+              label="Sign out"
               labelColor="#C1440E"
               right={<Ionicons name="chevron-forward" size={16} color="#C1440E" />}
             />

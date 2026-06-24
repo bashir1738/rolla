@@ -104,11 +104,6 @@ export function DepositModal({ tier, visible, onClose }: {
                       }`}
                       onPress={() => { setTokenIdx(i); setRawAmt(''); }}
                     >
-                      <Ionicons
-                        name={tk.symbol === 'USDT' ? 'cash-outline' : 'logo-bitcoin'}
-                        size={16}
-                        color={tokenIdx === i ? '#D4A017' : '#6B7C74'}
-                      />
                       <Text className={`font-bold text-sm ${tokenIdx === i ? 'text-accent' : 'text-muted'}`}>
                         {tk.symbol}
                       </Text>
@@ -120,7 +115,7 @@ export function DepositModal({ tier, visible, onClose }: {
               {/* Amount input */}
               <View className="bg-card border border-border rounded-2xl px-4 py-4">
                 <TextInput
-                  className="text-charcoal text-2xl font-black"
+                  className="text-charcoal text-2xl "
                   placeholder={`Min ${t.minUSDT} USDT`}
                   placeholderTextColor="#6B7C74"
                   value={rawAmt}
@@ -167,7 +162,6 @@ export function DepositModal({ tier, visible, onClose }: {
               {/* Lock warning */}
               {t.lockDays > 0 && (
                 <View className="flex-row gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  <Ionicons name="lock-closed" size={18} color="#D4A017" />
                   <Text className="flex-1 text-charcoal text-sm">
                     Funds locked for <Text className="font-bold">{t.lockDays} days</Text>.
                     Withdrawals not possible before maturity.

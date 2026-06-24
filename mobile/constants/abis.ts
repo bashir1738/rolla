@@ -47,7 +47,7 @@ export const AJO_CIRCLE_ABI = [
       { name: 'frequency', type: 'uint256' },
       { name: 'status', type: 'uint8' },
       { name: 'payoutPending', type: 'bool' },
-      { name: 'paidCount', type: 'uint8' },
+      { name: 'paidCount', type: 'uint256' },
     ] },
 
   { type: 'function', name: 'getMembers', stateMutability: 'view',
@@ -132,11 +132,43 @@ export const ROLLA_VAULT_ABI = [
       { name: 'claimed', type: 'bool' },
     ] },
 
+  // Public state getters for tier configuration
+  { type: 'function', name: 'minDeposits', stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }] },
+  { type: 'function', name: 'lockDurations', stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }] },
+  { type: 'function', name: 'aprBps', stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }] },
+
   // Events
   { type: 'event', name: 'VaultCreated',
     inputs: [{ name: 'vaultId', type: 'uint256', indexed: true }, { name: 'owner', type: 'address', indexed: true }, { name: 'tier', type: 'uint8', indexed: false }, { name: 'usdtDeposited', type: 'uint256', indexed: false }] },
   { type: 'event', name: 'VaultClaimed',
     inputs: [{ name: 'vaultId', type: 'uint256', indexed: true }, { name: 'owner', type: 'address', indexed: true }, { name: 'usdtValue', type: 'uint256', indexed: false }, { name: 'tokenOut', type: 'address', indexed: false }] },
+] as const;
+
+// Uniswap V3 QuoterV2 — quoteExactInputSingle (nonpayable, called via eth_call simulation)
+export const QUOTER_V2_ABI = [
+  { type: 'function', name: 'quoteExactInputSingle', stateMutability: 'nonpayable',
+    inputs: [{
+      name: 'params', type: 'tuple',
+      components: [
+        { name: 'tokenIn',           type: 'address' },
+        { name: 'tokenOut',          type: 'address' },
+        { name: 'amountIn',          type: 'uint256' },
+        { name: 'fee',               type: 'uint24'  },
+        { name: 'sqrtPriceLimitX96', type: 'uint160' },
+      ],
+    }],
+    outputs: [
+      { name: 'amountOut',               type: 'uint256' },
+      { name: 'sqrtPriceX96After',       type: 'uint160' },
+      { name: 'initializedTicksCrossed', type: 'uint32'  },
+      { name: 'gasEstimate',             type: 'uint256' },
+    ] },
 ] as const;
 
 // UsernameRegistry ABI

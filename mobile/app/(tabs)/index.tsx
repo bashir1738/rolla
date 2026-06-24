@@ -1,14 +1,17 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { WalletButton } from '../../components/WalletButton';
 import { CircleCard } from '../../components/CircleCard';
 import { CircleDetail } from '../../components/CircleDetail';
+import { ProfileButton } from '../../components/ProfileSidebar';
+import { useProfileSidebar } from '../../contexts/ProfileSidebarContext';
 import { useCircles, type CircleData } from '../../hooks/useCircles';
 import { useWallet } from '../../providers/WalletContext';
 import { useDisplayName } from '../../hooks/useDisplayName';
+import { useRefresh } from '../../hooks/useRefresh';
 
 function fmtUSDT(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2 });
@@ -19,34 +22,55 @@ export default function HomeTab() {
   const { isConnected, connect, address } = useWallet();
   const { display } = useDisplayName(address);
   const { circles, isLoading } = useCircles();
+  const { openSidebar } = useProfileSidebar();
+  const { refreshing, refresh } = useRefresh();
   const [selected, setSelected] = React.useState<CircleData | null>(null);
+  const [balanceHidden, setBalanceHidden] = React.useState(false);
 
   const totalSaved = circles.reduce((s, c) => s + c.poolBalance, 0n);
-  const pendingPayouts = circles.filter((c) => c.payoutPending && c.myPosition === c.currentRound + 1);
+  const pendingPayouts = circles.filter((c) => c.payoutPending && c.myPosition === c.currentRound);
   const activeCount = circles.filter((c) => c.status === 1).length;
 
   return (
     <SafeAreaView className="flex-1 bg-primary" edges={['top']}>
-      {/* Header */}
-      <View className="flex-row justify-between items-start px-5 pt-4 pb-2">
-        <View>
-          <Text className="text-white text-lg font-bold">Hello, {display}</Text>
-          <Text className="text-white/60 text-sm mt-0.5">Your savings, on your terms</Text>
+      {/* ── Top bar ── */}
+      <View className="flex-row items-center justify-between px-5 pt-3 pb-1">
+        <View className="flex-row items-center gap-2">
+          <View className="w-8 h-8 rounded-xl bg-accent items-center justify-center">
+            <Ionicons name="leaf" size={15} color="#1A3C2B" />
+          </View>
+          <Text className="text-white font-semibold text-xl tracking-tight">Rolla</Text>
         </View>
-        <View className="flex-row items-center gap-3">
-          
+        <View className="flex-row items-center gap-2">
           <WalletButton />
+          <ProfileButton onPress={openSidebar} />
         </View>
       </View>
 
-      {/* Balance Card */}
-      <View className="mx-4 mb-3  p-5 ">
-        <Text className="text-white/70 text-xs uppercase tracking-widest mb-1">Total in Circles</Text>
-        <Text className="text-white text-3xl font-black mb-3">${fmtUSDT(totalSaved)} USDT</Text>
-        <View className="flex-row gap-4">
-          <StatPill count={activeCount} label="active" color="#4ADE80" />
-          <StatPill count={pendingPayouts.length} label="payout" color="#D4A017" />
-          <StatPill count={circles.length} label="circles" color="rgba(255,255,255,0.6)" />
+      {/* ── Greeting ── */}
+      <View className="px-5 pt-5 pb-7">
+        <Text className="text-white/40 text-[11px] uppercase tracking-[2px] font-semibold mb-1.5">
+          Total in Circles
+        </Text>
+        <View className="flex-row items-center gap-3 mb-5">
+          <Text className="text-white text-5xl font-semibold tracking-tight leading-none">
+            {balanceHidden ? '••••••' : `$${fmtUSDT(totalSaved)}`}
+          </Text>
+          <View className="gap-1.5">
+            <TouchableOpacity onPress={() => setBalanceHidden((h) => !h)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Ionicons name={balanceHidden ? 'eye-off-outline' : 'eye-outline'} size={18} color="white" />
+            </TouchableOpacity>
+            <View className="bg-white/10 rounded-md px-1.5 py-0.5">
+              <Text className="text-white/50 text-xs font-bold">USDT</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Stat chips */}
+        <View className="flex-row gap-2">
+          <StatChip icon="radio-button-on" value={activeCount} label="Active" tint="#4ADE80" />
+          <StatChip icon="gift-outline" value={pendingPayouts.length} label="Payout" tint="#D4A017" />
+          <StatChip icon="people-circle-outline" value={circles.length} label="Circles" tint="rgba(255,255,255,0.55)" />
         </View>
       </View>
 
@@ -55,6 +79,9 @@ export default function HomeTab() {
         className="flex-1 bg-surface rounded-t-3xl"
         contentContainerClassName="px-4 pt-5 pb-10"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#1A3C2B" colors={['#1A3C2B']} />
+        }
       >
         {/* Payout alert */}
         {pendingPayouts.length > 0 && (
@@ -88,17 +115,17 @@ export default function HomeTab() {
         {!isConnected ? (
           <View className="items-center py-10 gap-3">
             <View className="w-16 h-16 rounded-full bg-primary/10 items-center justify-center">
-              <Ionicons name="wallet-outline" size={30} color="#1A3C2B" />
+              <Ionicons name="log-in-outline" size={30} color="#1A3C2B" />
             </View>
-            <Text className="text-charcoal font-bold text-base">Connect your wallet</Text>
+            <Text className="text-charcoal font-bold text-base">Sign in to get started</Text>
             <Text className="text-muted text-sm text-center px-6">
-              Connect to view your savings circles and start earning.
+              Sign in with your social account to view your savings circles and start earning.
             </Text>
             <TouchableOpacity
               className="bg-primary rounded-full px-6 py-3 mt-1"
               onPress={connect}
             >
-              <Text className="text-white font-bold">Connect Wallet</Text>
+              <Text className="text-white font-bold">Sign in</Text>
             </TouchableOpacity>
           </View>
         ) : isLoading ? (
@@ -150,11 +177,14 @@ export default function HomeTab() {
   );
 }
 
-function StatPill({ count, label, color }: { count: number; label: string; color: string }) {
+function StatChip({
+  icon, value, label, tint,
+}: { icon: React.ComponentProps<typeof Ionicons>['name']; value: number; label: string; tint: string }) {
   return (
-    <View className="flex-row items-center gap-1.5">
-      <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-      <Text className="text-white/80 text-xs">{count} {label}</Text>
+    <View className="flex-row items-center gap-1.5 bg-white/10 rounded-full px-3 py-1.5 border border-white/10">
+      <Ionicons name={icon} size={11} color={tint} />
+      <Text className="text-white font-bold text-xs">{value}</Text>
+      <Text className="text-white/50 text-xs">{label}</Text>
     </View>
   );
 }

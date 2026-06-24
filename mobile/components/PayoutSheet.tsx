@@ -32,7 +32,6 @@ export function PayoutSheet({ target, visible, onClose }: PayoutSheetProps) {
   const [tokenIdx, setTokenIdx] = useState(0);
   const [slippage, setSlippage] = useState(0.5);
   const [showSlip, setShowSlip] = useState(false);
-  const [recipient, setRecipient] = useState('');
 
   const { claim, txState, txHash, error, reset } = useClaim();
 
@@ -191,27 +190,6 @@ export function PayoutSheet({ target, visible, onClose }: PayoutSheetProps) {
                   </View>
                 </View>
               )}
-
-              {/* Receiving address (editable) */}
-              <View>
-                <Text className="text-muted text-xs font-bold uppercase tracking-wider mb-2">
-                  Receiving wallet
-                </Text>
-                <View className="flex-row items-center gap-2 bg-card border border-border rounded-xl px-4 py-3">
-                  <Ionicons name="wallet-outline" size={16} color="#6B7C74" />
-                  <TextInput
-                    className="flex-1 text-charcoal text-sm font-mono"
-                    placeholder="Your connected wallet"
-                    placeholderTextColor="#8FA98C"
-                    value={recipient}
-                    onChangeText={setRecipient}
-                    autoCapitalize="none"
-                  />
-                </View>
-                <Text className="text-muted text-xs mt-1 px-1">
-                  Leave blank to use your connected wallet
-                </Text>
-              </View>
 
               {/* Confirm button */}
               <TouchableOpacity

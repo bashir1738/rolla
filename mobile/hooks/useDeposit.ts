@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
-import { useWriteContract } from 'wagmi';
+import { useState, useCallback, useEffect } from 'react';
+import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import type { TxState } from '../providers/WalletContext';
-import { CONTRACT_ADDRESSES, TOKEN_ADDRESSES } from '../constants/addresses';
+import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { ROLLA_VAULT_ABI } from '../constants/abis';
 
 const ERC20_APPROVE_ABI = [
@@ -26,6 +26,19 @@ export function useDeposit() {
 
   const { writeContractAsync } = useWriteContract();
 
+  // Wait for the deposit tx to actually mine before declaring success.
+  const { isSuccess: mined, isError: revertedOnChain, error: receiptError } =
+    useWaitForTransactionReceipt({ hash: txHash ?? undefined });
+
+  useEffect(() => {
+    if (txState !== 'confirming') return;
+    if (mined) setTxState('success');
+    else if (revertedOnChain) {
+      setError(receiptError?.message ?? 'Transaction reverted on-chain');
+      setTxState('error');
+    }
+  }, [mined, revertedOnChain, receiptError, txState]);
+
   const deposit = useCallback(async (params: DepositParams) => {
     setTxState('signing');
     setError(null);
@@ -34,7 +47,7 @@ export function useDeposit() {
       const isNative = params.tokenIn === '0x0000000000000000000000000000000000000000';
 
       if (!isNative) {
-        // Approve vault to spend token
+        // Approve vault to spend token (this tx is awaited but not receipt-tracked)
         await writeContractAsync({
           address: params.tokenIn,
           abi: ERC20_APPROVE_ABI,
@@ -42,8 +55,6 @@ export function useDeposit() {
           args: [CONTRACT_ADDRESSES.ROLLA_VAULT, params.amountIn],
         });
       }
-
-      setTxState('confirming');
 
       const hash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.ROLLA_VAULT,
@@ -54,8 +65,9 @@ export function useDeposit() {
       });
 
       setTxHash(hash);
-      setTxState('success');
+      setTxState('confirming'); // now wait for the receipt
     } catch (e: any) {
+      if (__DEV__) console.warn('[deposit] failed:', e);
       setError(e?.shortMessage ?? e?.message ?? 'Transaction failed');
       setTxState('error');
     }

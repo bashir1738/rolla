@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useReadContract } from 'wagmi';
 import { AjoPot } from './AjoPot';
 import { TxStateView } from './TxStateView';
+import { InviteModal } from './InviteModal';
 import { useContribute } from '../hooks/useContribute';
 import { useClaim } from '../hooks/useClaim';
 import { useWallet } from '../providers/WalletContext';
@@ -65,10 +66,13 @@ export function CircleDetail({ circle, visible, onClose }: {
   const { address } = useWallet();
   const contribute = useContribute();
   const claim = useClaim();
+  const [showInvite, setShowInvite] = useState(false);
 
   const fillPercent = circle.totalRounds > 0 ? (circle.currentRound / circle.totalRounds) * 100 : 0;
-  const isRecipient = circle.payoutPending && circle.myPosition === circle.currentRound + 1;
+  const isRecipient = circle.payoutPending && circle.myPosition === circle.currentRound;
   const canContribute = circle.status === 1 && !circle.payoutPending && circle.myPosition > 0;
+  const isCreator = circle.members[0]?.toLowerCase() === address?.toLowerCase();
+  const canInvite = isCreator && circle.status === 0 && circle.members.length < circle.maxMembers;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -119,7 +123,7 @@ export function CircleDetail({ circle, visible, onClose }: {
                 key={m}
                 addr={m}
                 position={i + 1}
-                isNext={i + 1 === circle.currentRound + 1 && circle.payoutPending}
+                isNext={i + 1 === circle.currentRound && circle.payoutPending}
                 isMe={m.toLowerCase() === address?.toLowerCase()}
               />
             ))}
@@ -140,6 +144,16 @@ export function CircleDetail({ circle, visible, onClose }: {
 
         {/* Footer */}
         <View className="px-4 pb-6 pt-3 border-t border-border bg-card gap-3">
+          {canInvite && (
+            <TouchableOpacity
+              className="bg-accent/20 border border-accent/30 rounded-full py-3.5 items-center flex-row justify-center gap-2"
+              onPress={() => setShowInvite(true)}
+              accessibilityLabel="Invite members"
+            >
+              <Ionicons name="person-add-outline" size={17} color="#1A3C2B" />
+              <Text className="text-primary font-bold">Invite Members</Text>
+            </TouchableOpacity>
+          )}
           {isRecipient && claim.txState === 'idle' && (
             <TouchableOpacity
               className="bg-primary rounded-full py-4 items-center flex-row justify-center gap-2"
@@ -180,6 +194,8 @@ export function CircleDetail({ circle, visible, onClose }: {
           </TouchableOpacity>
         </View>
       </View>
+
+      <InviteModal visible={showInvite} circle={circle} onClose={() => setShowInvite(false)} />
     </Modal>
   );
 }

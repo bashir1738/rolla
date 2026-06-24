@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-// Polyfills for wagmi + WalletConnect / Reown AppKit on React Native.
-// MUST be imported before any wagmi code evaluates.
+// Polyfills for wagmi/viem on React Native.
+// MUST be imported before any wagmi code evaluates (see index.js).
 //
-// IMPORTANT: This file uses require() (not import) for the native packages so a
-// missing native module (e.g. in Expo Go) can be caught instead of aborting the
-// whole module. The pure-JS crypto fallback is installed FIRST so it is always
-// in place even if every native package below fails to load.
+// IMPORTANT: native packages are loaded with require() (not import) so a missing
+// native module (e.g. in Expo Go) can be caught instead of aborting the whole
+// module. The pure-JS crypto fallback is installed FIRST so it is always in
+// place even if every native package below fails to load.
 
 declare const global: any;
 const g: any =
@@ -51,7 +51,12 @@ function ensureGetRandomValues() {
 
 ensureGetRandomValues();
 
-// ── 2. Try the native secure RNG (works only in real dev/prod builds) ─────────
+// ── 2. TextEncoder/TextDecoder (required by viem) ─────────────────────────────
+try {
+  require('fast-text-encoding');
+} catch {}
+
+// ── 3. Native secure RNG (works only in real dev/prod builds) ─────────────────
 try {
   require('react-native-get-random-values');
   // Verify it actually works — in Expo Go it may be a stub that throws on call.
@@ -64,12 +69,12 @@ try {
   } catch {}
 }
 
-// ── 3. WalletConnect RN compat (window, TextEncoder, URL, …) ──────────────────
+// ── 4. ethers shims (Magic's signer stack relies on these globals) ────────────
 try {
-  require('@walletconnect/react-native-compat');
+  require('@ethersproject/shims');
 } catch {}
 
-// ── 4. compat may have replaced global.crypto — re-ensure getRandomValues ─────
+// ── 5. A native import above may have replaced global.crypto — re-ensure ──────
 ensureGetRandomValues();
 try {
   // Final smoke test; if the current impl throws, force the JS fallback.
@@ -80,76 +85,28 @@ try {
   } catch {}
 }
 
-// ── 5. Suppress noisy WalletConnect unhandled promise rejections ──────────────
-// The WC relay can deliver session events (e.g. a `chainChanged` that triggers
-// switchEthereumChain, or an event for a session the wallet already dropped)
-// that reject deep inside SignClient. These surface as "Uncaught (in promise)"
-// rejections — which ErrorUtils.setGlobalHandler does NOT catch.
-//
-// IMPORTANT: with the new architecture the app runs on Hermes, which uses its
-// OWN native Promise. Hooking the `promise` npm package therefore does nothing —
-// the rejections must be intercepted via HermesInternal's rejection tracker.
-const WC_NOISE = [
-  "Cannot read property 'request' of undefined",
-  "Cannot read properties of undefined (reading 'request')",
-  "session topic doesn't exist",
-  'No matching key',
-  'Missing or invalid. session topic',
-  'session is not connected',
-  'provider is not initialized',
-  'switchEthereumChain',
-  'isValidSessionTopic',
-];
-
-let wcStorageCleared = false;
-function clearStaleWCStorage() {
-  if (wcStorageCleared) return;
-  wcStorageCleared = true;
-  try {
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-    AsyncStorage.getAllKeys()
-      .then((keys: string[]) => {
-        const stale = keys.filter(
-          (k) => k.startsWith('wc@') || k.startsWith('@walletconnect') || k.includes('WALLETCONNECT'),
-        );
-        if (stale.length > 0) return AsyncStorage.multiRemove(stale);
-      })
-      .catch(() => {});
-  } catch {}
-}
-
-function isWCNoise(message: string) {
-  return WC_NOISE.some((p) => message.includes(p));
-}
-
-const rejectionHandler = {
-  allRejections: true,
-  onUnhandled: (id: number, error: any) => {
-    const message = (error && (error.message || String(error))) || '';
-    if (isWCNoise(message)) {
-      // A dead session topic will keep firing every launch until storage is
-      // wiped — clear the WC keys once so it doesn't recur next start.
-      if (message.includes("session topic doesn't exist") || message.includes('No matching key')) {
-        clearStaleWCStorage();
-      }
-      return; // swallow WC noise
+// ── 6. CustomEvent — wagmi's event emitter uses it ───────────────────────────
+if (typeof (g as any).CustomEvent === 'undefined') {
+  (g as any).CustomEvent = class CustomEvent {
+    type: string;
+    detail: any;
+    constructor(type: string, options?: { detail?: any }) {
+      this.type = type;
+      this.detail = options?.detail ?? null;
     }
-    // Preserve visibility for every other rejection (console.error → LogBox).
-    // eslint-disable-next-line no-console
-    console.error(`Possible unhandled promise rejection (id: ${id}):`, error);
-  },
-  onHandled: () => {},
-};
+  };
+}
 
-// Hermes path (default under the new architecture).
-const hermes: any = (g as any).HermesInternal;
-if (hermes && typeof hermes.enablePromiseRejectionTracker === 'function') {
-  try {
-    hermes.enablePromiseRejectionTracker(rejectionHandler);
-  } catch {}
-} else {
-  // Fallback for JSC / non-Hermes runtimes.
-  try {
-    require('promise/setimmediate/rejection-tracking').enable(rejectionHandler);
-  } catch {}
+// ── 7. window stubs — wagmi calls window.addEventListener for storage events ──
+// React Native aliases window → global but omits browser DOM APIs.
+if (typeof window !== 'undefined') {
+  if (typeof (window as any).addEventListener !== 'function') {
+    (window as any).addEventListener = () => {};
+  }
+  if (typeof (window as any).removeEventListener !== 'function') {
+    (window as any).removeEventListener = () => {};
+  }
+  if (typeof (window as any).dispatchEvent !== 'function') {
+    (window as any).dispatchEvent = () => false;
+  }
 }

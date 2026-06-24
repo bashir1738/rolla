@@ -14,7 +14,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { applyGlobalFont } from '../lib/applyFonts';
 import { WagmiQueryProvider } from '../providers/WagmiProvider';
 import { WalletProvider } from '../providers/WalletContext';
+import { LoginSheet } from '../components/LoginSheet';
+import { ProfileSidebar } from '../components/ProfileSidebar';
+import { ProfileSidebarProvider, useProfileSidebar } from '../contexts/ProfileSidebarContext';
 import { useNotifications } from '../hooks/useNotifications';
+import { magic } from '../lib/magicClient';
 
 // Force Satoshi on all text app-wide (runs once at module load).
 applyGlobalFont();
@@ -26,7 +30,8 @@ export const unstable_settings = { initialRouteName: 'index' };
 SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
-  useNotifications(); // Register background task + request permissions on mount
+  useNotifications();
+  const { sidebarVisible, closeSidebar } = useProfileSidebar();
   return (
     <>
       <StatusBar style="light" />
@@ -35,6 +40,8 @@ function AppContent() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
       </Stack>
+      <LoginSheet />
+      <ProfileSidebar visible={sidebarVisible} onClose={closeSidebar} />
     </>
   );
 }
@@ -57,9 +64,12 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <WagmiQueryProvider>
         <WalletProvider>
-          <AppContent />
+          <ProfileSidebarProvider>
+            <AppContent />
+          </ProfileSidebarProvider>
         </WalletProvider>
       </WagmiQueryProvider>
+      <magic.Relayer />
     </SafeAreaProvider>
   );
 }

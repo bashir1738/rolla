@@ -2,14 +2,55 @@ import { useMemo } from 'react';
 import { useReadContract, useReadContracts, useAccount } from 'wagmi';
 import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { ROLLA_VAULT_ABI } from '../constants/abis';
+import { sepolia } from 'wagmi/chains';
 
 export type VaultTier = 'Flex' | 'Growth' | 'Power';
 
+// Fallback values (used until on-chain data loads).
 export const VAULT_TIERS = {
   Flex:   { tier: 0 as const, aprBps: 450,  lockDays: 0,   minUSDT: 10,  icon: 'water-outline',   label: 'Flex' },
   Growth: { tier: 1 as const, aprBps: 920,  lockDays: 90,  minUSDT: 100, icon: 'leaf-outline',    label: 'Growth' },
   Power:  { tier: 2 as const, aprBps: 1480, lockDays: 365, minUSDT: 500, icon: 'flash-outline',   label: 'Power' },
 } as const;
+
+const TIERS = [0, 1, 2] as const;
+const TIER_KEYS: VaultTier[] = ['Flex', 'Growth', 'Power'];
+
+/**
+ * Reads minDeposits, lockDurations, and aprBps from the deployed RollaVault
+ * contract so the UI stays in sync with on-chain values after redeployment.
+ */
+export function useVaultTiersFromChain() {
+  const VAULT_REF = { address: CONTRACT_ADDRESSES.ROLLA_VAULT, abi: ROLLA_VAULT_ABI } as const;
+
+  const contracts = useMemo(() => TIERS.flatMap((t) => [
+    { ...VAULT_REF, functionName: 'minDeposits',   args: [BigInt(t)] },
+    { ...VAULT_REF, functionName: 'lockDurations',  args: [BigInt(t)] },
+    { ...VAULT_REF, functionName: 'aprBps',          args: [BigInt(t)] },
+  ]), []);
+
+  const { data } = useReadContracts({ contracts, query: { staleTime: 300_000 } });
+
+  return useMemo(() => {
+    if (!data) return VAULT_TIERS;
+    type Mutable = { tier: 0|1|2; aprBps: number; lockDays: number; minUSDT: number; icon: string; label: string };
+    const result: Record<VaultTier, Mutable> = {
+      Flex:   { ...VAULT_TIERS.Flex },
+      Growth: { ...VAULT_TIERS.Growth },
+      Power:  { ...VAULT_TIERS.Power },
+    };
+    TIERS.forEach((t) => {
+      const min  = data[t * 3]?.result as bigint | undefined;
+      const lock = data[t * 3 + 1]?.result as bigint | undefined;
+      const apr  = data[t * 3 + 2]?.result as bigint | undefined;
+      const key  = TIER_KEYS[t];
+      if (min)  result[key].minUSDT  = Number(min)  / 1_000_000;
+      if (lock) result[key].lockDays = Number(lock) / 86_400;
+      if (apr)  result[key].aprBps   = Number(apr);
+    });
+    return result as unknown as typeof VAULT_TIERS;
+  }, [data]);
+}
 
 export interface VaultData {
   id: number;

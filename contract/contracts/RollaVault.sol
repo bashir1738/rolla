@@ -21,8 +21,9 @@ contract RollaVault is ReentrancyGuard {
     address public immutable USDT;
     address public immutable UNISWAP_ROUTER;
     address public immutable AAVE_POOL;
-    address public immutable A_USDT; // Aave aUSDT token on Sepolia
+    address public immutable A_USDT;
     address public immutable WETH;
+    address public immutable owner;
 
     // ─── Types ───────────────────────────────────────────────────────────────
     enum VaultTier {
@@ -34,18 +35,18 @@ contract RollaVault is ReentrancyGuard {
     struct Vault {
         address owner;
         VaultTier tier;
-        uint256 principalUSDT;    // USDT deposited (6 decimals)
-        uint256 aTokenShares;     // Aave scaled balance at deposit time
+        uint256 principalUSDT;
+        uint256 aTokenShares;
         uint256 depositTimestamp;
         uint256 maturityTimestamp;
-        uint256 lockDuration;     // 0 for Flex
+        uint256 lockDuration;
         bool claimed;
     }
 
     // ─── Tier Config ─────────────────────────────────────────────────────────
-    uint256[3] public minDeposits   = [10e6,  100e6,  500e6];   // USDT 6 dec
+    uint256[3] public minDeposits   = [10e6,  100e6,  500e6];
     uint256[3] public lockDurations = [0,     90 days, 365 days];
-    uint256[3] public aprBps        = [450,   920,    1480];     // basis points (for projections)
+    uint256[3] public aprBps        = [450,   920,    1480];
 
     // ─── Storage ─────────────────────────────────────────────────────────────
     mapping(uint256 => Vault) public vaults;
@@ -86,14 +87,11 @@ contract RollaVault is ReentrancyGuard {
         AAVE_POOL = _aavePool;
         A_USDT = _aUsdt;
         WETH = _weth;
+        owner = msg.sender;
     }
 
     // ─── External: Deposit ───────────────────────────────────────────────────
 
-    /// @notice Deposit any EVM token into a vault tier.
-    ///         Token is swapped to USDT (if needed) then supplied to Aave V3.
-    ///         tokenIn == address(0) accepts native ETH via msg.value.
-    /// @return vaultId The ID of the newly created vault.
     function deposit(
         VaultTier tier,
         address tokenIn,
@@ -101,12 +99,15 @@ contract RollaVault is ReentrancyGuard {
         uint256 amountOutMinimum,
         uint24 poolFee
     ) external payable nonReentrant returns (uint256 vaultId) {
-        uint256 tierIdx = uint256(tier);
+        // Reject accidental ETH on ERC20 paths
+        if (tokenIn != address(0)) {
+            require(msg.value == 0, "ETH not accepted for ERC20 path");
+        }
 
+        uint256 tierIdx = uint256(tier);
         uint256 usdtAmount = _pullAndSwapToUSDT(tokenIn, amountIn, amountOutMinimum, poolFee);
         require(usdtAmount >= minDeposits[tierIdx], "Below tier minimum");
 
-        // Snapshot Aave scaled balance before and after deposit to track per-vault shares
         uint256 scaledBefore = IAToken(A_USDT).scaledBalanceOf(address(this));
         _safeApprove(USDT, AAVE_POOL, usdtAmount);
         IPool(AAVE_POOL).supply(USDT, usdtAmount, address(this), 0);
@@ -122,18 +123,14 @@ contract RollaVault is ReentrancyGuard {
         v.aTokenShares = scaledAfter - scaledBefore;
         v.depositTimestamp = block.timestamp;
         v.lockDuration = lockDuration;
-        // Flex: maturity = depositTimestamp (claimable after the deposit block)
         v.maturityTimestamp = lockDuration == 0 ? block.timestamp : block.timestamp + lockDuration;
 
         _userVaults[msg.sender].push(vaultId);
-
         emit VaultCreated(vaultId, msg.sender, tier, usdtAmount);
     }
 
     // ─── External: Claim ─────────────────────────────────────────────────────
 
-    /// @notice Claim a matured vault — receives USDT or any EVM token.
-    ///         tokenOut == USDT → direct transfer; address(0) → native ETH; other → swap.
     function claim(
         uint256 vaultId,
         address tokenOut,
@@ -143,22 +140,17 @@ contract RollaVault is ReentrancyGuard {
         Vault storage v = vaults[vaultId];
         require(v.owner == msg.sender, "Not vault owner");
         require(!v.claimed, "Already claimed");
-        // Prevent flash-loan same-block claim (applies to Flex vaults too)
         require(block.timestamp > v.depositTimestamp, "Cannot claim same block as deposit");
 
         if (v.lockDuration > 0) {
             require(block.timestamp >= v.maturityTimestamp, "Vault not yet matured");
         }
 
-        // Mark before external calls (checks-effects-interactions)
         v.claimed = true;
 
-        // Compute current USDT value including Aave yield
-        uint256 normalizedIncome = IPool(AAVE_POOL).getReserveNormalizedIncome(USDT);
-        uint256 usdtValue = (v.aTokenShares * normalizedIncome) / RAY;
-
-        // Withdraw from Aave — returns actual amount (may differ by 1 wei due to rounding)
-        uint256 withdrawn = IPool(AAVE_POOL).withdraw(USDT, usdtValue, address(this));
+        // Use type(uint256).max to withdraw the full scaled balance, avoiding
+        // 1-wei rounding issues when Aave recomputes the amount internally.
+        uint256 withdrawn = IPool(AAVE_POOL).withdraw(USDT, type(uint256).max, address(this));
 
         emit VaultClaimed(vaultId, msg.sender, withdrawn, tokenOut);
 
@@ -167,7 +159,6 @@ contract RollaVault is ReentrancyGuard {
 
     // ─── View Functions ──────────────────────────────────────────────────────
 
-    /// @notice Current USDT value of a vault, including accrued Aave yield.
     function getVaultBalance(uint256 vaultId) external view returns (uint256) {
         Vault storage v = vaults[vaultId];
         if (v.claimed) return 0;
@@ -175,8 +166,6 @@ contract RollaVault is ReentrancyGuard {
         return (v.aTokenShares * income) / RAY;
     }
 
-    /// @notice APR-based earnings projection for UI display.
-    ///         Note: actual yield comes from Aave; this uses the tier's target APR.
     function getProjectedEarnings(uint256 vaultId, uint256 atTimestamp)
         external
         view
@@ -188,7 +177,6 @@ contract RollaVault is ReentrancyGuard {
         return (v.principalUSDT * aprBps[uint256(v.tier)] * elapsed) / (365 days * 10_000);
     }
 
-    /// @notice True if the vault can be claimed right now.
     function isMatured(uint256 vaultId) external view returns (bool) {
         Vault storage v = vaults[vaultId];
         if (v.claimed || v.owner == address(0)) return false;
@@ -197,9 +185,19 @@ contract RollaVault is ReentrancyGuard {
         return block.timestamp >= v.maturityTimestamp;
     }
 
-    /// @notice Returns all vault IDs owned by a user.
     function getUserVaults(address user) external view returns (uint256[] memory) {
         return _userVaults[user];
+    }
+
+    // ─── Admin ───────────────────────────────────────────────────────────────
+
+    /// @notice Rescue ETH accidentally sent directly to the contract.
+    function rescueETH() external {
+        require(msg.sender == owner, "Not owner");
+        uint256 bal = address(this).balance;
+        require(bal > 0, "No ETH");
+        (bool ok, ) = owner.call{value: bal}("");
+        require(ok, "ETH rescue failed");
     }
 
     // ─── Internal ────────────────────────────────────────────────────────────

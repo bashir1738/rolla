@@ -97,13 +97,8 @@ async function setup() {
 
 export function useNotifications() {
   useEffect(() => {
-    setup().catch((e) => {
-      if (__DEV__) {
-        console.warn(
-          '[Rolla] Notifications/background tasks unavailable. Use a development build for push support. ' +
-            (e?.message ?? String(e))
-        );
-      }
+    setup().catch(() => {
+      if (__DEV__) console.info('[Rolla] Push + background tasks require a dev build — skipped in Expo Go.');
     });
   }, []);
 }

@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { useWriteContract } from 'wagmi';
+import { useState, useCallback, useEffect } from 'react';
+import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import type { TxState } from '../providers/WalletContext';
 import { CONTRACT_ADDRESSES } from '../constants/addresses';
@@ -18,6 +18,19 @@ export function useCreateCircle() {
   const [error, setError] = useState<string | null>(null);
   const { writeContractAsync } = useWriteContract();
 
+  // Wait for the tx to actually mine before declaring success.
+  const { isSuccess: mined, isError: revertedOnChain, error: receiptError } =
+    useWaitForTransactionReceipt({ hash: txHash ?? undefined });
+
+  useEffect(() => {
+    if (txState !== 'confirming') return;
+    if (mined) setTxState('success');
+    else if (revertedOnChain) {
+      setError(receiptError?.message ?? 'Transaction reverted on-chain');
+      setTxState('error');
+    }
+  }, [mined, revertedOnChain, receiptError, txState]);
+
   const createCircle = useCallback(
     async (params: CreateCircleParams) => {
       setTxState('signing');
@@ -25,7 +38,6 @@ export function useCreateCircle() {
       setTxHash(null);
       try {
         const contribution = parseUnits(String(params.contributionUSDT), 6);
-        setTxState('confirming');
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.AJO_CIRCLE,
           abi: AJO_CIRCLE_ABI,
@@ -38,9 +50,10 @@ export function useCreateCircle() {
           ],
         });
         setTxHash(hash);
-        setTxState('success');
+        setTxState('confirming'); // now wait for the receipt
         return hash;
       } catch (e: any) {
+        if (__DEV__) console.warn('[createCircle] failed:', e);
         setError(e?.shortMessage ?? e?.message ?? 'Failed to create circle');
         setTxState('error');
         throw e;

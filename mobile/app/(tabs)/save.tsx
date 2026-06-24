@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { VaultCard } from '../../components/VaultCard';
 import { DepositModal } from '../../components/DepositModal';
 import { PayoutSheet } from '../../components/PayoutSheet';
+import { ProfileButton } from '../../components/ProfileSidebar';
+import { useProfileSidebar } from '../../contexts/ProfileSidebarContext';
 import { useVaults, type VaultData } from '../../hooks/useVaults';
 import { useWallet } from '../../providers/WalletContext';
 import { VAULT_TIERS, type VaultTier } from '../../hooks/useVaults';
+import { useRefresh } from '../../hooks/useRefresh';
 
 const TIER_KEYS: VaultTier[] = ['Flex', 'Growth', 'Power'];
 const TIER_DESCS: Record<VaultTier, string> = {
@@ -19,6 +22,8 @@ const TIER_DESCS: Record<VaultTier, string> = {
 export default function SaveTab() {
   const { isConnected } = useWallet();
   const { vaults, isLoading } = useVaults();
+  const { openSidebar } = useProfileSidebar();
+  const { refreshing, refresh } = useRefresh();
   const [depositTier, setDepositTier] = useState<VaultTier | null>(null);
   const [claimVault, setClaimVault] = useState<VaultData | null>(null);
 
@@ -26,14 +31,22 @@ export default function SaveTab() {
     <SafeAreaView className="flex-1 bg-primary" edges={['top']}>
       {/* Header */}
       <View className="bg-primary px-5 pt-3 pb-6">
-        <Text className="text-white text-2xl font-black">Save & Earn</Text>
-        <Text className="text-white/60 text-sm mt-1">Deposit any token · Earn Aave yield</Text>
+        <View className="flex-row justify-between items-start">
+          <View>
+            <Text className="text-white text-2xl font-semibold">Save & Earn</Text>
+            <Text className="text-white/60 text-sm mt-1">Deposit any token · Earn Aave yield</Text>
+          </View>
+          <ProfileButton onPress={openSidebar} />
+        </View>
       </View>
 
       <ScrollView
         className="flex-1 bg-surface rounded-t-3xl"
         contentContainerClassName="px-4 pt-5 pb-10"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#1A3C2B" colors={['#1A3C2B']} />
+        }
       >
         {/* Tier cards */}
         <View className="flex-row items-center gap-2 mb-3">
@@ -56,8 +69,8 @@ export default function SaveTab() {
                   <Ionicons name={t.icon as any} size={24} color="#1A3C2B" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-charcoal font-bold text-base">{key} Vault</Text>
-                  <Text className="text-primary font-black text-xl">{(t.aprBps / 100).toFixed(1)}% APR</Text>
+                  <Text className="text-charcoal font-medium text-base">{key} Vault</Text>
+                  <Text className="text-primary font-bold text-xl">{(t.aprBps / 100).toFixed(1)}% APR</Text>
                   <Text className="text-muted text-xs">{TIER_DESCS[key]}</Text>
                 </View>
                 <TouchableOpacity

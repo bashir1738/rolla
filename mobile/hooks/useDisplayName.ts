@@ -27,7 +27,7 @@ export function useDisplayName(address?: `0x${string}`) {
     typeof onChainRaw === 'string' && onChainRaw.length > 0 ? onChainRaw : null;
 
   // 2. Local AsyncStorage fallback (this user's own device only)
-  useEffect(() => {
+  const readLocal = useCallback(() => {
     if (!address) { setLocalName(null); setLoaded(true); return; }
     setLoaded(false);
     AsyncStorage.getItem(localKey(address))
@@ -43,6 +43,8 @@ export function useDisplayName(address?: `0x${string}`) {
       .catch(() => setLocalName(null))
       .finally(() => setLoaded(true));
   }, [address]);
+
+  useEffect(() => { readLocal(); }, [readLocal]);
 
   const save = useCallback(async (newName: string, signature?: string) => {
     if (!address) return;
@@ -62,5 +64,5 @@ export function useDisplayName(address?: `0x${string}`) {
   const name = onChainName ?? localName;
   const display = name ?? (address ? fmtAddr(address) : null);
 
-  return { display, name, onChainName, localName, loaded, save, clear };
+  return { display, name, onChainName, localName, loaded, save, clear, refetch: readLocal };
 }

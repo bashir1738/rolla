@@ -1,93 +1,169 @@
-import React, { createContext, useContext, useEffect, useCallback } from 'react';
-import { useAccount, useDisconnect } from 'wagmi';
-import { useAppKit } from '@reown/appkit-wagmi-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { getAddress } from 'viem';
+import { magic } from '../lib/magicClient';
+import { MAGIC_CONNECTOR_ID } from '../lib/magicConnector';
+
+async function getMagicAddress(retries = 3): Promise<`0x${string}` | null> {
+  const provider = magic.rpcProvider as unknown as { request: (args: { method: string }) => Promise<string[]> };
+  for (let i = 0; i < retries; i++) {
+    try {
+      const accounts = await provider.request({ method: 'eth_accounts' });
+      const addr = accounts?.[0];
+      if (addr) return getAddress(addr) as `0x${string}`;
+    } catch {}
+    // Brief wait before retry — new accounts may take a moment to provision
+    if (i < retries - 1) await new Promise((r) => setTimeout(r, 800));
+  }
+  return null;
+}
 
 export type TxState = 'idle' | 'signing' | 'confirming' | 'success' | 'error';
 
 interface WalletContextValue {
   address: `0x${string}` | undefined;
   isConnected: boolean;
+  chainId: number | undefined;
   connect: () => void;
   disconnect: () => void;
-  chainId: number | undefined;
+  isReady: boolean;
+  isAuthenticated: boolean;
+  isWalletReady: boolean;
+  loginWithEmail: (email: string) => Promise<void>;
+  isLoggingIn: boolean;
+  loginVisible: boolean;
+  closeLogin: () => void;
 }
+
+const noop = () => {};
 
 const WalletContext = createContext<WalletContextValue>({
   address: undefined,
   isConnected: false,
-  connect: () => {},
-  disconnect: () => {},
   chainId: undefined,
+  connect: noop,
+  disconnect: noop,
+  isReady: false,
+  isAuthenticated: false,
+  isWalletReady: false,
+  loginWithEmail: async () => {},
+  isLoggingIn: false,
+  loginVisible: false,
+  closeLogin: noop,
 });
 
-// Removes all WalletConnect v2 AsyncStorage entries so stale sessions
-// don't block reconnection after the wallet app clears its own sessions.
-async function clearStaleWCSessions() {
-  try {
-    const keys = await AsyncStorage.getAllKeys();
-    const stale = keys.filter(
-      (k) => k.startsWith('wc@') || k.startsWith('@walletconnect') || k.includes('WALLETCONNECT'),
-    );
-    if (stale.length > 0) await AsyncStorage.multiRemove(stale);
-  } catch {}
-}
-
-const isWCInternalError = (msg: string) =>
-  // Stale session — wallet app cleared its sessions
-  msg.includes("session topic doesn't exist") ||
-  msg.includes('No matching key') ||
-  msg.includes('Missing or invalid. session topic') ||
-  // Race condition — relay delivers an event before SignClient finishes init
-  msg.includes("Cannot read property 'request' of undefined") ||
-  msg.includes("Cannot read properties of undefined (reading 'request')") ||
-  // Generic WC provider not ready
-  msg.includes('provider is not initialized') ||
-  msg.includes('session is not connected');
-
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const { address, isConnected, chainId } = useAccount();
-  const { disconnect: wagmiDisconnect } = useDisconnect();
-  const { open } = useAppKit();
+  const { address: wagmiAddress, isConnected, chainId } = useAccount();
+  const { connectors, connectAsync } = useConnect();
+  const { disconnectAsync } = useDisconnect();
 
-  const disconnect = useCallback(() => {
-    try { wagmiDisconnect(); } catch {}
-  }, [wagmiDisconnect]);
+  const [isReady, setIsReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginVisible, setLoginVisible] = useState(false);
+  // Fallback address from Magic metadata — used until wagmi wires up.
+  const [magicAddress, setMagicAddress] = useState<`0x${string}` | undefined>();
+
+  const wiringRef = useRef(false);
+
+  const wireWagmi = useCallback(async () => {
+    if (wiringRef.current) return;
+    wiringRef.current = true;
+    try {
+      const connector = connectors.find((c) => c.id === MAGIC_CONNECTOR_ID);
+      if (connector) await connectAsync({ connector });
+    } catch (e: any) {
+      // "Connector already connected" is fine — wagmi is ahead of our state.
+      const msg: string = e?.message ?? '';
+      if (!msg.includes('already connected') && __DEV__) {
+        console.warn('[Magic] wagmi wiring failed:', e);
+      }
+    } finally {
+      wiringRef.current = false;
+    }
+  }, [connectors, connectAsync]);
+
+  // Restore existing Magic session on mount.
+  useEffect(() => {
+    magic.user.isLoggedIn()
+      .then(async (loggedIn) => {
+        if (loggedIn) {
+          try {
+            const addr = await getMagicAddress();
+            if (addr) {
+              setMagicAddress(addr);
+              setIsAuthenticated(true);
+              await wireWagmi();
+            } else {
+              await magic.user.logout().catch(() => {});
+            }
+          } catch {
+            await magic.user.logout().catch(() => {});
+          }
+        }
+        setIsReady(true);
+      })
+      .catch(() => setIsReady(true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    // WalletConnect relay sends messages for sessions that no longer exist in
-    // the wallet app (e.g. after wallet reinstall or storage clear). Intercept
-    // the resulting unhandled rejection, wipe stale storage, and disconnect so
-    // the user can pair a fresh session.
-    const original = (global as any).ErrorUtils?.getGlobalHandler?.();
+    if (isAuthenticated && !isConnected && magicAddress) wireWagmi();
+  }, [isAuthenticated, isConnected, magicAddress, wireWagmi]);
 
-    (global as any).ErrorUtils?.setGlobalHandler?.((error: Error, isFatal: boolean) => {
-      if (!isFatal && isWCInternalError(error?.message ?? '')) {
-        // For stale-session errors clear storage + disconnect so the user
-        // gets a clean reconnect prompt. For pure race-condition errors
-        // (client not ready) we just suppress — no storage cleanup needed.
-        const msg = error?.message ?? '';
-        if (
-          msg.includes("session topic doesn't exist") ||
-          msg.includes('No matching key') ||
-          msg.includes('Missing or invalid. session topic')
-        ) {
-          clearStaleWCSessions().then(() => disconnect());
-        }
-        return; // suppress all WC internal errors from the global crash handler
-      }
-      original?.(error, isFatal);
-    });
+  const loginWithEmail = useCallback(async (email: string) => {
+    setLoginVisible(false);
+    setIsLoggingIn(true);
+    try {
+      await magic.auth.loginWithEmailOTP({ email, showUI: true });
+      const addr = await getMagicAddress();
+      if (addr) setMagicAddress(addr);
+      setIsAuthenticated(true);
+      await wireWagmi();
+    } catch (e) {
+      if (__DEV__) console.warn('[Magic] Email login failed:', e);
+      setLoginVisible(true);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }, [wireWagmi]);
 
-    return () => {
-      (global as any).ErrorUtils?.setGlobalHandler?.(original);
-    };
-  }, [disconnect]);
+  const disconnect = useCallback(async () => {
+    // Clear state immediately so the UI updates on first tap, not second.
+    setIsAuthenticated(false);
+    setMagicAddress(undefined);
+    try { await disconnectAsync(); } catch {}
+    try { await magic.user.logout(); } catch {}
+  }, [disconnectAsync]);
+
+  const connect = useCallback(() => setLoginVisible(true), []);
+  const closeLogin = useCallback(() => setLoginVisible(false), []);
+
+  // wagmi address is authoritative once connected; Magic metadata is the fallback.
+  const address = wagmiAddress ?? magicAddress;
 
   return (
-    <WalletContext.Provider
-      value={{ address, isConnected, connect: () => open(), disconnect, chainId }}
-    >
+    <WalletContext.Provider value={{
+      address,
+      isConnected: isConnected && isAuthenticated,
+      chainId,
+      connect,
+      disconnect,
+      isReady,
+      isAuthenticated,
+      isWalletReady: isAuthenticated && !!address,
+      loginWithEmail,
+      isLoggingIn,
+      loginVisible,
+      closeLogin,
+    }}>
       {children}
     </WalletContext.Provider>
   );

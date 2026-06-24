@@ -101,6 +101,70 @@ export function useCircles() {
   return { circles, isLoading: countLoading || readsLoading };
 }
 
+/**
+ * Returns all recruiting circles (status === 0) that the connected wallet has
+ * NOT yet joined. These are shown in the "Discover" section so users can join.
+ */
+export function useOpenCircles() {
+  const { address } = useAccount();
+  const { data: countData, isLoading: countLoading } = useCircleCount();
+  const count = countData ? Number(countData) : 0;
+
+  const contracts = useMemo(() => {
+    if (!count) return [];
+    const calls: any[] = [];
+    for (let id = 0; id < count; id++) {
+      calls.push({ ...AJO, functionName: 'getCircleInfo', args: [BigInt(id)] });
+      calls.push({ ...AJO, functionName: 'getMembers',    args: [BigInt(id)] });
+      // Position 0 = not a member; position > 0 = already joined.
+      if (address) {
+        calls.push({ ...AJO, functionName: 'getMemberPosition', args: [BigInt(id), address] });
+      }
+    }
+    return calls;
+  }, [count, address]);
+
+  const stride = address ? 3 : 2;
+
+  const { data, isLoading: readsLoading } = useReadContracts({
+    contracts,
+    query: { enabled: contracts.length > 0, refetchInterval: 30_000 },
+  });
+
+  const openCircles = useMemo<CircleData[]>(() => {
+    if (!data) return [];
+    const out: CircleData[] = [];
+    for (let id = 0; id < count; id++) {
+      const info    = data[id * stride]?.result as any;
+      const members = (data[id * stride + 1]?.result as string[]) ?? [];
+      const myPos   = address ? Number((data[id * stride + 2]?.result as bigint) ?? 0n) : 0;
+
+      if (!info) continue;
+
+      const [
+        name, maxMembers, contributionAmount, currentRound, totalRounds,
+        poolBalance, nextPayoutTimestamp, frequency, status, payoutPending, paidCount,
+      ] = info as [string, bigint, bigint, bigint, bigint, bigint, bigint, bigint, number, boolean, number];
+
+      // Only show recruiting circles the user hasn't joined yet.
+      if (Number(status) !== 0 || myPos !== 0) continue;
+
+      out.push({
+        id, name, emoji: emojiFor(id),
+        maxMembers: Number(maxMembers), contributionAmount,
+        currentRound: Number(currentRound), totalRounds: Number(totalRounds),
+        poolBalance, nextPayoutTimestamp: Number(nextPayoutTimestamp),
+        frequency: Number(frequency), status: 0,
+        payoutPending, paidCount: Number(paidCount),
+        members, myPosition: 0,
+      });
+    }
+    return out;
+  }, [data, count, address, stride]);
+
+  return { openCircles, isLoading: countLoading || readsLoading };
+}
+
 export function useCircle(circleId: number) {
   const { circles, isLoading } = useCircles();
   return { circle: circles.find((c) => c.id === circleId) ?? null, isLoading };
