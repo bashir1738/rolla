@@ -23,8 +23,13 @@ function lockPct(v: VaultData) {
 
 export function VaultCard({ vault, onClaim }: { vault: VaultData; onClaim: () => void }) {
   const tier = VAULT_TIERS[(['Flex', 'Growth', 'Power'] as const)[vault.tier]];
-  const earned = vault.currentBalanceUSDC - vault.principalUSDC;
   const pct = lockPct(vault);
+
+  // Calculate projected earnings using the same APR formula as the contract.
+  // No Aave yield on Sepolia — projected earnings are estimated, not on-chain.
+  const elapsed = Math.max(0, Math.floor(Date.now() / 1000) - vault.depositTimestamp);
+  const projected = (vault.principalUSDC * BigInt(tier.aprBps) * BigInt(elapsed)) /
+                    (BigInt(365 * 24 * 3600) * 10000n);
 
   return (
     <View className="bg-card rounded-2xl p-4 mb-3 border border-border shadow-sm">
@@ -49,10 +54,10 @@ export function VaultCard({ vault, onClaim }: { vault: VaultData; onClaim: () =>
           <Text className="text-charcoal font-black text-lg">${fmtUSDC(vault.currentBalanceUSDC)}</Text>
         </View>
         <View className="items-end">
-          <Text className="text-muted text-[10px] uppercase tracking-wide mb-1">Earned</Text>
+          <Text className="text-muted text-[10px] uppercase tracking-wide mb-1">Projected</Text>
           <View className="flex-row items-center gap-1">
             <Ionicons name="trending-up" size={14} color="#1A3C2B" />
-            <Text className="text-primary font-black text-lg">+${fmtUSDC(earned)}</Text>
+            <Text className="text-primary font-black text-lg">+${fmtUSDC(projected)}</Text>
           </View>
         </View>
       </View>
@@ -82,7 +87,7 @@ export function VaultCard({ vault, onClaim }: { vault: VaultData; onClaim: () =>
         >
           <Ionicons name="cash-outline" size={18} color="white" />
           <Text className="text-white font-bold text-base">
-            Claim ${fmtUSDC(vault.currentBalanceUSDC)}
+            Claim ${fmtUSDC(vault.principalUSDC)}
           </Text>
         </TouchableOpacity>
       )}

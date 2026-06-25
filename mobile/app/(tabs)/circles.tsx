@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CircleCard } from '../../components/CircleCard';
@@ -23,6 +23,7 @@ export default function CirclesTab() {
   const [selected, setSelected] = useState<CircleData | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [query, setQuery] = useState('');
 
   React.useEffect(() => {
     if (isSuccess) {
@@ -31,9 +32,15 @@ export default function CirclesTab() {
     }
   }, [isSuccess]);
 
-  const active     = circles.filter((c) => c.status === 1);
-  const recruiting = circles.filter((c) => c.status === 0);
-  const completed  = circles.filter((c) => c.status === 2);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return circles;
+    return circles.filter((c) => c.name.toLowerCase().includes(q));
+  }, [circles, query]);
+
+  const active     = filtered.filter((c) => c.status === 1);
+  const recruiting = filtered.filter((c) => c.status === 0);
+  const completed  = filtered.filter((c) => c.status === 2);
 
   return (
     <SafeAreaView className="flex-1 bg-primary" edges={['top']}>
@@ -64,8 +71,31 @@ export default function CirclesTab() {
             <ProfileButton onPress={openSidebar} />
           </View>
         </View>
-          <Text className="text-white/60 text-sm mt-4">
-            {active.length} active · {recruiting.length} recruiting · {completed.length} completed
+        {/* Search bar */}
+        <View className="flex-row items-center gap-2 mt-4 bg-white/10 rounded-2xl px-3 py-2.5">
+          <Ionicons name="search-outline" size={16} color="rgba(255,255,255,0.5)" />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search circles…"
+            placeholderTextColor="rgba(255,255,255,0.4)"
+            className="flex-1 text-white text-sm"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.5)" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text className="text-white/60 text-sm mt-3">
+          {query
+            ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''} for "${query}"`
+            : `${active.length} active · ${recruiting.length} recruiting · ${completed.length} completed`}
         </Text>
       </View>
 
@@ -109,6 +139,17 @@ export default function CirclesTab() {
                   <CircleCard key={c.id} circle={c} onPress={() => setSelected(c)} />
                 ))}
               </>
+            ) : query ? (
+              <View className="flex-1 items-center justify-center gap-3 px-8 py-16">
+                <Ionicons name="search-outline" size={48} color="#8FA98C" />
+                <Text className="text-charcoal font-bold text-lg text-center">No results</Text>
+                <Text className="text-muted text-sm text-center">
+                  No circles match "{query}"
+                </Text>
+                <TouchableOpacity onPress={() => setQuery('')} className="mt-2">
+                  <Text className="text-primary font-semibold text-sm">Clear search</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <View className="flex-1 items-center justify-center gap-3 px-8 py-16">
                 <Ionicons name="people-circle-outline" size={52} color="#8FA98C" />

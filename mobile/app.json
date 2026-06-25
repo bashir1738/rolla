@@ -71,7 +71,8 @@
       "router": {},
       "eas": {
         "projectId": "55d4a7e6-c32f-43f1-8cbf-18a750d0aa86"
-      }
+      },
+      "BACKEND_URL": "https://rolla-lime.vercel.app"
     },
     "owner": "bashir1738"
   }

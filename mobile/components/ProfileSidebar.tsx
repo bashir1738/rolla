@@ -11,6 +11,8 @@ import { useSignMessage, useWriteContract, useWaitForTransactionReceipt } from '
 import { waitForTransactionReceipt } from '@wagmi/core';
 import { useWallet } from '../providers/WalletContext';
 import { useDisplayName, fmtAddr } from '../hooks/useDisplayName';
+import { useAuth } from '../contexts/AuthContext';
+import { PinPad } from './PinPad';
 import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { USERNAME_REGISTRY_ABI } from '../constants/abis';
 import { wagmiConfig } from '../providers/WagmiProvider';
@@ -140,6 +142,101 @@ function NameEditor({ currentName, save, onDone }: {
   );
 }
 
+// ── PIN Editor ────────────────────────────────────────────────────────────────
+
+type PinStep = 'verify' | 'enter' | 'confirm' | 'done';
+
+function PinEditor({ hasPin, onDone }: { hasPin: boolean; onDone: () => void }) {
+  const { verifyPin, setupPin } = useAuth();
+  const [step, setStep]       = useState<PinStep>(hasPin ? 'verify' : 'enter');
+  const [old, setOld]         = useState('');
+  const [next, setNext]       = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError]     = useState(false);
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  const shake = () => {
+    setError(true);
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 8,  duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 5,  duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0,  duration: 55, useNativeDriver: true }),
+    ]).start(() => setError(false));
+  };
+
+  const onKey = async (key: string) => {
+    const update = (cur: string): string => {
+      if (key === '⌫') return cur.slice(0, -1);
+      if (cur.length >= 4) return cur;
+      return cur + key;
+    };
+
+    if (step === 'verify') {
+      const val = update(old);
+      setOld(val);
+      if (val.length === 4) {
+        const ok = await verifyPin(val);
+        if (ok) { setTimeout(() => { setOld(''); setStep('enter'); }, 150); }
+        else    { shake(); setTimeout(() => setOld(''), 500); }
+      }
+    } else if (step === 'enter') {
+      const val = update(next);
+      setNext(val);
+      if (val.length === 4) setTimeout(() => setStep('confirm'), 150);
+    } else if (step === 'confirm') {
+      const val = update(confirm);
+      setConfirm(val);
+      if (val.length === 4) {
+        if (val === next) {
+          await setupPin(next);
+          setStep('done');
+          setTimeout(onDone, 900);
+        } else {
+          shake();
+          setTimeout(() => setConfirm(''), 500);
+        }
+      }
+    }
+  };
+
+  const TITLES: Record<PinStep, string> = {
+    verify:  'Enter current PIN',
+    enter:   hasPin ? 'Enter new PIN' : 'Create your PIN',
+    confirm: 'Confirm new PIN',
+    done:    'PIN saved!',
+  };
+
+  const activeValue = step === 'verify' ? old : step === 'enter' ? next : confirm;
+
+  if (step === 'done') {
+    return (
+      <View style={{ alignItems: 'center', paddingVertical: 24, gap: 10 }}>
+        <Ionicons name="checkmark-circle" size={38} color="#4ADE80" />
+        <Text style={{ color: '#1A3C2B', fontWeight: '700', fontSize: 15 }}>PIN updated!</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ paddingTop: 12, paddingBottom: 8 }}>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: '#1C1C1E', textAlign: 'center', marginBottom: 18 }}>
+        {TITLES[step]}
+      </Text>
+      <PinPad
+        length={4}
+        value={activeValue}
+        onKey={onKey}
+        error={error}
+        shakeAnim={shakeAnim}
+      />
+      <TouchableOpacity onPress={onDone} style={{ marginTop: 14, alignItems: 'center' }}>
+        <Text style={{ color: '#6B7C74', fontSize: 13 }}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -152,7 +249,9 @@ export function ProfileSidebar({ visible, onClose }: Props) {
 
   const { address, isConnected, disconnect, connect } = useWallet();
   const { display, name, save, clear } = useDisplayName(address);
+  const { isSetup: pinSetup } = useAuth();
   const [editingName, setEditingName] = useState(false);
+  const [editingPin, setEditingPin]   = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
 
   useEffect(() => {
@@ -304,6 +403,27 @@ export function ProfileSidebar({ visible, onClose }: Props) {
                     right={<Ionicons name="chevron-forward" size={16} color="#C1440E" />}
                   />
                 </TouchableOpacity>
+              </View>
+
+              <Text style={styles.sectionLabel}>Security</Text>
+              <View style={styles.card}>
+                {editingPin ? (
+                  <PinEditor hasPin={pinSetup} onDone={() => setEditingPin(false)} />
+                ) : (
+                  <TouchableOpacity onPress={() => setEditingPin(true)}>
+                    <SidebarRow
+                      icon="lock-closed-outline"
+                      iconBg="rgba(26,60,43,0.08)"
+                      label={pinSetup ? 'Change PIN' : 'Create PIN'}
+                      right={
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={styles.rowMeta}>{pinSetup ? '••••' : 'Not set'}</Text>
+                          <Ionicons name="chevron-forward" size={14} color="#6B7C74" />
+                        </View>
+                      }
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
 
               <Text style={styles.sectionLabel}>Network</Text>

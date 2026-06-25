@@ -5,6 +5,7 @@ import type { TxState } from '../providers/WalletContext';
 import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { ROLLA_VAULT_ABI } from '../constants/abis';
 import { wagmiConfig } from '../providers/WagmiProvider';
+import { useAuth } from '../contexts/AuthContext';
 
 const ERC20_APPROVE_ABI = [
   { type: 'function', name: 'approve', stateMutability: 'nonpayable',
@@ -26,6 +27,7 @@ export function useDeposit() {
   const [vaultId, setVaultId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { requireAuth } = useAuth();
   const { writeContractAsync } = useWriteContract();
 
   // Wait for the deposit tx to actually mine before declaring success.
@@ -42,6 +44,9 @@ export function useDeposit() {
   }, [mined, revertedOnChain, receiptError, txState]);
 
   const deposit = useCallback(async (params: DepositParams) => {
+    const authed = await requireAuth();
+    if (!authed) return;
+
     setTxState('signing');
     setError(null);
     setTxHash(null);
@@ -74,7 +79,7 @@ export function useDeposit() {
       setError(e?.shortMessage ?? e?.message ?? 'Transaction failed');
       setTxState('error');
     }
-  }, [writeContractAsync]);
+  }, [writeContractAsync, requireAuth]);
 
   const reset = useCallback(() => {
     setTxState('idle');

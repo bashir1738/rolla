@@ -12,28 +12,36 @@ let taskDefined = false;
 
 async function runChecks(Notifications: any) {
   const { readContract } = require('wagmi/actions');
+  const { getAccount } = require('@wagmi/core');
   const { wagmiConfig } = require('../providers/WagmiProvider');
   const { CONTRACT_ADDRESSES } = require('../constants/addresses');
   const { AJO_CIRCLE_ABI } = require('../constants/abis');
 
-  const circleCount = await readContract(wagmiConfig, {
+  // Only check circles belonging to the connected wallet
+  const { address } = getAccount(wagmiConfig);
+  if (!address) return;
+
+  const circleIds = await readContract(wagmiConfig, {
     address: CONTRACT_ADDRESSES.AJO_CIRCLE,
     abi: AJO_CIRCLE_ABI,
-    functionName: 'circleCount',
-  });
+    functionName: 'getUserCircles',
+    args: [address],
+  }) as bigint[];
+
+  if (!circleIds?.length) return;
 
   const now = Math.floor(Date.now() / 1000);
 
-  for (let i = 0; i < Number(circleCount); i++) {
+  for (const id of circleIds) {
     const info = await readContract(wagmiConfig, {
       address: CONTRACT_ADDRESSES.AJO_CIRCLE,
       abi: AJO_CIRCLE_ABI,
       functionName: 'getCircleInfo',
-      args: [BigInt(i)],
+      args: [id],
     });
 
     const [name, , , , , , nextPayout, , status, payoutPending] = info as any[];
-    if (status !== 1) continue;
+    if (Number(status) !== 1) continue; // only active circles
 
     const hoursUntil = (Number(nextPayout) - now) / 3600;
     if (hoursUntil > 0 && hoursUntil <= 24) {

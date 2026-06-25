@@ -3,6 +3,7 @@ import { useWriteContract } from 'wagmi';
 import type { TxState } from '../providers/WalletContext';
 import { CONTRACT_ADDRESSES, TOKEN_ADDRESSES } from '../constants/addresses';
 import { AJO_CIRCLE_ABI, ROLLA_VAULT_ABI } from '../constants/abis';
+import { useAuth } from '../contexts/AuthContext';
 
 type ClaimParams =
   | { type: 'circle'; circleId: number; tokenOut: `0x${string}`; amountOutMinimum: bigint; poolFee: number }
@@ -13,9 +14,13 @@ export function useClaim() {
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { requireAuth } = useAuth();
   const { writeContractAsync } = useWriteContract();
 
   const claim = useCallback(async (params: ClaimParams) => {
+    const authed = await requireAuth();
+    if (!authed) return;
+
     setTxState('signing');
     setError(null);
     setTxHash(null);
@@ -45,7 +50,7 @@ export function useClaim() {
       setError(e?.shortMessage ?? e?.message ?? 'Transaction failed');
       setTxState('error');
     }
-  }, [writeContractAsync]);
+  }, [writeContractAsync, requireAuth]);
 
   const reset = useCallback(() => { setTxState('idle'); setError(null); setTxHash(null); }, []);
 

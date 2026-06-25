@@ -12,6 +12,7 @@ import { useCircles, type CircleData } from '../../hooks/useCircles';
 import { useWallet } from '../../providers/WalletContext';
 import { useDisplayName } from '../../hooks/useDisplayName';
 import { useRefresh } from '../../hooks/useRefresh';
+import { useFundWallet } from '../../hooks/useFundWallet';
 
 function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2 });
@@ -27,9 +28,13 @@ export default function HomeTab() {
   const [selected, setSelected] = React.useState<CircleData | null>(null);
   const [balanceHidden, setBalanceHidden] = React.useState(false);
 
+  // Auto-fund wallet if balance is low
+  useFundWallet(address);
+
   const totalSaved = circles.reduce((s, c) => s + c.poolBalance, 0n);
   const pendingPayouts = circles.filter((c) => c.payoutPending && c.myPosition === c.currentRound);
   const activeCount = circles.filter((c) => c.status === 1).length;
+
 
   return (
     <SafeAreaView className="flex-1 bg-primary" edges={['top']}>

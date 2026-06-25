@@ -12,7 +12,8 @@
       },
       "env": {
         "EXPO_PUBLIC_MAGIC_API_KEY": "pk_live_39CFEF716454E512",
-        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e"
+        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e",
+        "BACKEND_URL": "https://rolla-lime.vercel.app"
       }
     },
     "preview": {
@@ -22,14 +23,16 @@
       },
       "env": {
         "EXPO_PUBLIC_MAGIC_API_KEY": "pk_live_39CFEF716454E512",
-        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e"
+        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e",
+        "BACKEND_URL": "https://rolla-lime.vercel.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_MAGIC_API_KEY": "pk_live_39CFEF716454E512",
-        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e"
+        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e",
+        "BACKEND_URL": "https://rolla-lime.vercel.app"
       }
     }
   },

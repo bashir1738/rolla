@@ -3,9 +3,10 @@ import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
 import { parseUnits } from 'viem';
 import type { TxState } from '../providers/WalletContext';
-import { CONTRACT_ADDRESSES, TOKEN_ADDRESSES } from '../constants/addresses';
+import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { AJO_CIRCLE_ABI } from '../constants/abis';
 import { wagmiConfig } from '../providers/WagmiProvider';
+import { useAuth } from '../contexts/AuthContext';
 
 // ERC20 minimal ABI for approval
 const ERC20_ABI = [
@@ -27,21 +28,24 @@ export function useContribute() {
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { requireAuth } = useAuth();
   const { writeContractAsync } = useWriteContract();
 
   const contribute = useCallback(async (params: ContributeParams) => {
+    const authed = await requireAuth();
+    if (!authed) return;
+
     setTxState('signing');
     setError(null);
     setTxHash(null);
     try {
       const isNative = params.tokenIn === '0x0000000000000000000000000000000000000000';
-      const isUSDC = params.tokenIn.toLowerCase() === TOKEN_ADDRESSES.USDC.toLowerCase();
 
-      // Step 1: Approve then wait for receipt before contract calls transferFrom
+      // Step 1: Approve the circle contract to spend the token, then wait for
+      // the tx to mine so the allowance is set before contribute runs.
       if (!isNative) {
-        const spender = isUSDC ? TOKEN_ADDRESSES.USDC : params.tokenIn;
         const approveHash = await writeContractAsync({
-          address: spender,
+          address: params.tokenIn,
           abi: ERC20_ABI,
           functionName: 'approve',
           args: [CONTRACT_ADDRESSES.AJO_CIRCLE, params.amountIn],
@@ -69,10 +73,22 @@ export function useContribute() {
       setTxHash(hash);
       setTxState('success');
     } catch (e: any) {
-      setError(e?.shortMessage ?? e?.message ?? 'Transaction failed');
+      const msg: string = e?.message ?? '';
+      let friendly = 'Transaction failed. Please try again.';
+      if (msg.includes('TransferFrom failed') || msg.includes('transfer amount exceeds balance'))
+        friendly = 'Insufficient USDC balance. Get USDC from faucet.circle.com';
+      else if (msg.includes('Already contributed'))
+        friendly = 'You have already contributed this round.';
+      else if (msg.includes('Awaiting payout'))
+        friendly = 'Waiting for the current payout to be claimed first.';
+      else if (msg.includes('Not a member'))
+        friendly = 'You are not a member of this circle.';
+      else if (msg.includes('user rejected'))
+        friendly = 'Transaction cancelled.';
+      setError(friendly);
       setTxState('error');
     }
-  }, [writeContractAsync]);
+  }, [writeContractAsync, requireAuth]);
 
   const reset = useCallback(() => {
     setTxState('idle');
