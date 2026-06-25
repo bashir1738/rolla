@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import Constants from 'expo-constants';
 
 const TASK_NAME = 'rolla-background-check';
+const IN_EXPO_GO = Constants.appOwnership === 'expo';
 const INTERVAL_SECONDS = 15 * 60; // 15 minutes
 let taskDefined = false;
 
@@ -97,6 +99,7 @@ async function setup() {
 
 export function useNotifications() {
   useEffect(() => {
+    if (IN_EXPO_GO) return;
     setup().catch(() => {
       if (__DEV__) console.info('[Rolla] Push + background tasks require a dev build — skipped in Expo Go.');
     });

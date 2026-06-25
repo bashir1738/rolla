@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export type TxType = 'payout' | 'contribution' | 'deposit' | 'interest' | 'claim';
+export type TxType = 'payout' | 'contribution' | 'deposit' | 'interest' | 'claim' | 'circle_create' | 'circle_join';
 
 export interface Transaction {
   id: string;
@@ -10,21 +10,23 @@ export interface Transaction {
   label: string;
   subLabel?: string;
   date: Date;
-  amountUSDT: bigint;
+  amountUSDC: bigint;
   txHash?: string;
 }
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TYPE_META: Record<TxType, { icon: IoniconsName; iconColor: string; incoming: boolean; bg: string }> = {
-  payout:       { icon: 'cash-outline',          iconColor: '#1A3C2B', incoming: true,  bg: '#E8F5EE' },
-  contribution: { icon: 'arrow-up-circle-outline',iconColor: '#C1440E', incoming: false, bg: '#FDF0EC' },
-  deposit:      { icon: 'wallet-outline',         iconColor: '#1A3C2B', incoming: false, bg: '#E8F5EE' },
-  interest:     { icon: 'trending-up-outline',    iconColor: '#D4A017', incoming: true,  bg: '#FFF9E6' },
-  claim:        { icon: 'gift-outline',           iconColor: '#1A3C2B', incoming: true,  bg: '#E8F5EE' },
+  payout:        { icon: 'cash-outline',           iconColor: '#1A3C2B', incoming: true,  bg: '#E8F5EE' },
+  contribution:  { icon: 'arrow-up-circle-outline', iconColor: '#C1440E', incoming: false, bg: '#FDF0EC' },
+  deposit:       { icon: 'wallet-outline',          iconColor: '#1A3C2B', incoming: false, bg: '#E8F5EE' },
+  interest:      { icon: 'trending-up-outline',     iconColor: '#D4A017', incoming: true,  bg: '#FFF9E6' },
+  claim:         { icon: 'gift-outline',            iconColor: '#1A3C2B', incoming: true,  bg: '#E8F5EE' },
+  circle_create: { icon: 'people-circle-outline',   iconColor: '#1A3C2B', incoming: false, bg: '#E8F5EE' },
+  circle_join:   { icon: 'enter-outline',           iconColor: '#6B7C74', incoming: false, bg: '#F5F0E8' },
 };
 
-function fmtUSDT(v: bigint) {
+function fmtUSDC(v: bigint) {
   return (Number(v < 0n ? -v : v) / 1_000_000).toLocaleString('en-US', {
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   });
@@ -40,7 +42,7 @@ export function TransactionItem({ tx }: { tx: Transaction }) {
   return (
     <View
       className="flex-row items-center px-4 py-3 bg-card border-b border-border"
-      accessibilityLabel={`${tx.label} ${fmtUSDT(tx.amountUSDT)} USDT`}
+      accessibilityLabel={`${tx.label} ${fmtUSDC(tx.amountUSDC)} USDC`}
     >
       <View
         className="w-10 h-10 rounded-full items-center justify-center mr-3"
@@ -60,11 +62,13 @@ export function TransactionItem({ tx }: { tx: Transaction }) {
       </View>
 
       <View className="items-end gap-0.5">
-        <Text
-          className={`font-bold text-sm ${meta.incoming ? 'text-primary' : 'text-alert'}`}
-        >
-          {meta.incoming ? '+' : '-'}${fmtUSDT(tx.amountUSDT)}
-        </Text>
+        {tx.amountUSDC > 0n ? (
+          <Text className={`font-bold text-sm ${meta.incoming ? 'text-primary' : 'text-alert'}`}>
+            {meta.incoming ? '+' : '-'}${fmtUSDC(tx.amountUSDC)}
+          </Text>
+        ) : (
+          <Text className="text-muted text-xs font-medium">on-chain</Text>
+        )}
         {tx.txHash && (
           <View className="flex-row items-center gap-1">
             <Ionicons name="link-outline" size={10} color="#6B7C74" />

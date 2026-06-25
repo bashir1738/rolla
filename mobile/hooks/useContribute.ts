@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core';
 import { parseUnits } from 'viem';
 import type { TxState } from '../providers/WalletContext';
 import { CONTRACT_ADDRESSES, TOKEN_ADDRESSES } from '../constants/addresses';
 import { AJO_CIRCLE_ABI } from '../constants/abis';
+import { wagmiConfig } from '../providers/WagmiProvider';
 
 // ERC20 minimal ABI for approval
 const ERC20_ABI = [
@@ -33,23 +35,18 @@ export function useContribute() {
     setTxHash(null);
     try {
       const isNative = params.tokenIn === '0x0000000000000000000000000000000000000000';
-      const isUSDT = params.tokenIn.toLowerCase() === TOKEN_ADDRESSES.USDT.toLowerCase();
+      const isUSDC = params.tokenIn.toLowerCase() === TOKEN_ADDRESSES.USDC.toLowerCase();
 
-      // Step 1: Approve if ERC20 (not ETH or USDT direct path)
-      if (!isNative && !isUSDT) {
-        await writeContractAsync({
-          address: params.tokenIn,
+      // Step 1: Approve then wait for receipt before contract calls transferFrom
+      if (!isNative) {
+        const spender = isUSDC ? TOKEN_ADDRESSES.USDC : params.tokenIn;
+        const approveHash = await writeContractAsync({
+          address: spender,
           abi: ERC20_ABI,
           functionName: 'approve',
           args: [CONTRACT_ADDRESSES.AJO_CIRCLE, params.amountIn],
         });
-      } else if (isUSDT) {
-        await writeContractAsync({
-          address: TOKEN_ADDRESSES.USDT,
-          abi: ERC20_ABI,
-          functionName: 'approve',
-          args: [CONTRACT_ADDRESSES.AJO_CIRCLE, params.amountIn],
-        });
+        await waitForTransactionReceipt(wagmiConfig, { hash: approveHash });
       }
 
       setTxState('confirming');

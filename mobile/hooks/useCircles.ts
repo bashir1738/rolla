@@ -37,25 +37,33 @@ export function useCircleCount() {
 }
 
 /**
- * Reads every circle on-chain and returns the ones the connected wallet belongs
- * to. Returns an empty list when disconnected or when no circles exist.
+ * Reads the circles the connected wallet belongs to using getUserCircles(),
+ * then batch-fetches info for each one. Works with dynamic 6-digit circle IDs.
  */
 export function useCircles() {
   const { address } = useAccount();
-  const { data: countData, isLoading: countLoading } = useCircleCount();
-  const count = countData ? Number(countData) : 0;
 
-  // Build a batched read: info + members + my-position for each circle.
+  // Fetch the list of circle IDs this wallet is in
+  const { data: idsData, isLoading: idsLoading } = useReadContract({
+    ...AJO,
+    functionName: 'getUserCircles',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address, refetchInterval: 30_000 },
+  });
+
+  const ids = useMemo(() => (idsData as bigint[] | undefined) ?? [], [idsData]);
+
+  // Batch fetch info + members for each circle ID
   const contracts = useMemo(() => {
-    if (!count || !address) return [];
+    if (!ids.length || !address) return [];
     const calls: any[] = [];
-    for (let id = 0; id < count; id++) {
-      calls.push({ ...AJO, functionName: 'getCircleInfo', args: [BigInt(id)] });
-      calls.push({ ...AJO, functionName: 'getMembers', args: [BigInt(id)] });
-      calls.push({ ...AJO, functionName: 'getMemberPosition', args: [BigInt(id), address] });
+    for (const id of ids) {
+      calls.push({ ...AJO, functionName: 'getCircleInfo', args: [id] });
+      calls.push({ ...AJO, functionName: 'getMembers', args: [id] });
+      calls.push({ ...AJO, functionName: 'getMemberPosition', args: [id, address] });
     }
     return calls;
-  }, [count, address]);
+  }, [ids, address]);
 
   const { data, isLoading: readsLoading } = useReadContracts({
     contracts,
@@ -65,12 +73,12 @@ export function useCircles() {
   const circles = useMemo<CircleData[]>(() => {
     if (!data || !address) return [];
     const out: CircleData[] = [];
-    for (let id = 0; id < count; id++) {
-      const info = data[id * 3]?.result as any;
-      const members = (data[id * 3 + 1]?.result as string[]) ?? [];
-      const myPosition = Number((data[id * 3 + 2]?.result as bigint) ?? 0n);
+    ids.forEach((id, i) => {
+      const info = data[i * 3]?.result as any;
+      const members = (data[i * 3 + 1]?.result as string[]) ?? [];
+      const myPosition = Number((data[i * 3 + 2]?.result as bigint) ?? 0n);
 
-      if (!info || myPosition === 0) continue; // only circles the user is in
+      if (!info) return;
 
       const [
         name, maxMembers, contributionAmount, currentRound, totalRounds,
@@ -78,9 +86,9 @@ export function useCircles() {
       ] = info as [string, bigint, bigint, bigint, bigint, bigint, bigint, bigint, number, boolean, number];
 
       out.push({
-        id,
+        id: Number(id),
         name,
-        emoji: emojiFor(id),
+        emoji: emojiFor(Number(id)),
         maxMembers: Number(maxMembers),
         contributionAmount,
         currentRound: Number(currentRound),
@@ -94,75 +102,19 @@ export function useCircles() {
         members,
         myPosition,
       });
-    }
+    });
     return out;
-  }, [data, count, address]);
+  }, [data, ids, address]);
 
-  return { circles, isLoading: countLoading || readsLoading };
+  return { circles, isLoading: idsLoading || readsLoading };
 }
 
 /**
- * Returns all recruiting circles (status === 0) that the connected wallet has
- * NOT yet joined. These are shown in the "Discover" section so users can join.
+ * useOpenCircles is intentionally removed — with dynamic circle IDs we can't
+ * enumerate all circles without an indexer. Discovery is done via Join by ID.
  */
 export function useOpenCircles() {
-  const { address } = useAccount();
-  const { data: countData, isLoading: countLoading } = useCircleCount();
-  const count = countData ? Number(countData) : 0;
-
-  const contracts = useMemo(() => {
-    if (!count) return [];
-    const calls: any[] = [];
-    for (let id = 0; id < count; id++) {
-      calls.push({ ...AJO, functionName: 'getCircleInfo', args: [BigInt(id)] });
-      calls.push({ ...AJO, functionName: 'getMembers',    args: [BigInt(id)] });
-      // Position 0 = not a member; position > 0 = already joined.
-      if (address) {
-        calls.push({ ...AJO, functionName: 'getMemberPosition', args: [BigInt(id), address] });
-      }
-    }
-    return calls;
-  }, [count, address]);
-
-  const stride = address ? 3 : 2;
-
-  const { data, isLoading: readsLoading } = useReadContracts({
-    contracts,
-    query: { enabled: contracts.length > 0, refetchInterval: 30_000 },
-  });
-
-  const openCircles = useMemo<CircleData[]>(() => {
-    if (!data) return [];
-    const out: CircleData[] = [];
-    for (let id = 0; id < count; id++) {
-      const info    = data[id * stride]?.result as any;
-      const members = (data[id * stride + 1]?.result as string[]) ?? [];
-      const myPos   = address ? Number((data[id * stride + 2]?.result as bigint) ?? 0n) : 0;
-
-      if (!info) continue;
-
-      const [
-        name, maxMembers, contributionAmount, currentRound, totalRounds,
-        poolBalance, nextPayoutTimestamp, frequency, status, payoutPending, paidCount,
-      ] = info as [string, bigint, bigint, bigint, bigint, bigint, bigint, bigint, number, boolean, number];
-
-      // Only show recruiting circles the user hasn't joined yet.
-      if (Number(status) !== 0 || myPos !== 0) continue;
-
-      out.push({
-        id, name, emoji: emojiFor(id),
-        maxMembers: Number(maxMembers), contributionAmount,
-        currentRound: Number(currentRound), totalRounds: Number(totalRounds),
-        poolBalance, nextPayoutTimestamp: Number(nextPayoutTimestamp),
-        frequency: Number(frequency), status: 0,
-        payoutPending, paidCount: Number(paidCount),
-        members, myPosition: 0,
-      });
-    }
-    return out;
-  }, [data, count, address, stride]);
-
-  return { openCircles, isLoading: countLoading || readsLoading };
+  return { openCircles: [] as CircleData[], isLoading: false };
 }
 
 export function useCircle(circleId: number) {

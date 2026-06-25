@@ -6,9 +6,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useSignMessage } from 'wagmi';
+import Constants from 'expo-constants';
+import { useSignMessage, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core';
 import { useWallet } from '../providers/WalletContext';
 import { useDisplayName, fmtAddr } from '../hooks/useDisplayName';
+import { CONTRACT_ADDRESSES } from '../constants/addresses';
+import { USERNAME_REGISTRY_ABI } from '../constants/abis';
+import { wagmiConfig } from '../providers/WagmiProvider';
+
+// expo-notifications is unavailable in Expo Go SDK 53+
+const IN_EXPO_GO = Constants.appOwnership === 'expo';
 
 const SIDEBAR_WIDTH = Dimensions.get('window').width * 0.86;
 
@@ -37,27 +45,50 @@ function NameEditor({ currentName, save, onDone }: {
   save: (name: string, sig?: string) => Promise<void>;
   onDone: () => void;
 }) {
-  const { signMessageAsync } = useSignMessage();
+  const { writeContractAsync } = useWriteContract();
   const [input, setInput] = useState(currentName ?? '');
   const [stage, setStage] = useState<EditStage>('idle');
+  const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     const name = input.trim();
     if (!name) { onDone(); return; }
     setStage('signing');
-    let sig: string | undefined;
-    try { sig = await signMessageAsync({ message: `Rolla name: ${name}` }); } catch {}
-    await save(name, sig);
-    setStage('done');
-    setTimeout(onDone, 700);
+    setError(null);
+    try {
+      // Register name on-chain so all users can see it on circles
+      const hash = await writeContractAsync({
+        address: CONTRACT_ADDRESSES.USERNAME_REGISTRY,
+        abi: USERNAME_REGISTRY_ABI,
+        functionName: 'claim',
+        args: [name],
+      });
+      await waitForTransactionReceipt(wagmiConfig, { hash });
+      await save(name); // also cache locally
+      setStage('done');
+      setTimeout(onDone, 900);
+    } catch (e: any) {
+      const msg: string = e?.message ?? '';
+      if (msg.includes('NameTaken')) {
+        setError('That name is already taken — try another.');
+      } else if (msg.includes('CooldownActive')) {
+        setError('You changed your name recently. Try again in 24h.');
+      } else if (msg.includes('InvalidName')) {
+        setError('Only letters, numbers, hyphens and underscores (max 32 chars).');
+      } else {
+        setError('Transaction failed. Name saved locally only.');
+        await save(name);
+      }
+      setStage('idle');
+    }
   };
 
   if (stage === 'signing') {
     return (
       <View style={styles.editorCenter}>
         <ActivityIndicator color="#1A3C2B" />
-        <Text style={styles.editorTitle}>Saving your name…</Text>
-        <Text style={styles.editorSub}>If your wallet asks, tap approve — it's free</Text>
+        <Text style={styles.editorTitle}>Claiming name on-chain…</Text>
+        <Text style={styles.editorSub}>Approve in your wallet — one-time gas fee</Text>
       </View>
     );
   }
@@ -71,21 +102,28 @@ function NameEditor({ currentName, save, onDone }: {
   }
   return (
     <View style={styles.editorWrap}>
-      <View style={styles.editorInput}>
+      <View style={[styles.editorInput, error ? { borderColor: '#C1440E' } : {}]}>
         <Ionicons name="person-outline" size={16} color="#6B7C74" />
         <TextInput
           style={styles.editorText}
           placeholderTextColor="#6B7C74"
           placeholder="Your name or nickname"
           value={input}
-          onChangeText={setInput}
-          autoCapitalize="words"
+          onChangeText={(t) => { setInput(t); setError(null); }}
+          autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
           onSubmitEditing={handleSave}
           autoFocus
         />
       </View>
+      {error ? (
+        <Text style={{ color: '#C1440E', fontSize: 11, marginTop: 4, marginBottom: -4 }}>{error}</Text>
+      ) : (
+        <Text style={{ color: '#6B7C74', fontSize: 11, marginTop: 4, marginBottom: -4 }}>
+          Visible to all users on circles · letters, numbers, - and _ only
+        </Text>
+      )}
       <View style={styles.editorActions}>
         <TouchableOpacity
           style={[styles.editorSave, { opacity: !input.trim() ? 0.4 : 1 }]}
@@ -118,6 +156,7 @@ export function ProfileSidebar({ visible, onClose }: Props) {
   const [notifEnabled, setNotifEnabled] = useState(false);
 
   useEffect(() => {
+    if (IN_EXPO_GO) return;
     (async () => {
       try {
         const N = require('expo-notifications');
@@ -147,6 +186,10 @@ export function ProfileSidebar({ visible, onClose }: Props) {
   }, [visible]);
 
   const toggleNotifications = async (value: boolean) => {
+    if (IN_EXPO_GO) {
+      Alert.alert('Unavailable', 'Push notifications require a development build.');
+      return;
+    }
     if (!value) { setNotifEnabled(false); return; }
     try {
       const N = require('expo-notifications');

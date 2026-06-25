@@ -8,12 +8,11 @@ import { useSendTransaction, useWriteContract, useWaitForTransactionReceipt } fr
 import { parseEther, parseUnits, isAddress } from 'viem';
 import { TOKEN_ADDRESSES } from '../constants/addresses';
 
-type SendToken = 'ETH' | 'USDT' | 'WETH';
+type SendToken = 'ETH' | 'USDC';
 
 const TOKENS: { symbol: SendToken; label: string; decimals: number; bg: string }[] = [
   { symbol: 'ETH',  label: 'Ξ', decimals: 18, bg: '#627EEA' },
-  { symbol: 'USDT', label: '$', decimals: 6,  bg: '#26A17B' },
-  { symbol: 'WETH', label: 'Ξ', decimals: 18, bg: '#8A6EF0' },
+  { symbol: 'USDC', label: '$', decimals: 6,  bg: '#2775CA' },
 ];
 
 const ERC20_TRANSFER_ABI = [
@@ -30,7 +29,7 @@ const ERC20_TRANSFER_ABI = [
 ] as const;
 
 function tokenAddress(symbol: SendToken): `0x${string}` | undefined {
-  if (symbol === 'USDT') return TOKEN_ADDRESSES.USDT;
+  if (symbol === 'USDC') return TOKEN_ADDRESSES.USDC;
   if (symbol === 'WETH') return TOKEN_ADDRESSES.WETH;
   return undefined;
 }

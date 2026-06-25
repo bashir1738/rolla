@@ -19,7 +19,7 @@ interface Props {
   onCreate: (p: {
     name: string;
     maxMembers: number;
-    contributionUSDT: number;
+    contributionUSDC: number;
     frequencySeconds: number;
   }) => Promise<void>;
 }
@@ -46,7 +46,7 @@ export function CreateCircleWizard({ visible, onClose, txState, txHash, txError,
       await onCreate({
         name: name.trim(),
         maxMembers: members,
-        contributionUSDT: parseFloat(amount),
+        contributionUSDC: parseFloat(amount),
         frequencySeconds: FREQUENCIES[freqIdx].value,
       });
     } catch {
@@ -126,7 +126,7 @@ export function CreateCircleWizard({ visible, onClose, txState, txHash, txError,
 
                   <View>
                     <Text className="text-muted text-xs font-bold uppercase tracking-wider mb-2">
-                      Amount per round (USDT)
+                      Amount per round (USDC)
                     </Text>
                     <TextInput
                       className="bg-card border border-border rounded-2xl px-4 py-4 text-charcoal text-2xl font-black"
@@ -196,9 +196,9 @@ export function CreateCircleWizard({ visible, onClose, txState, txHash, txError,
                     {[
                       { label: 'Circle name',   value: name },
                       { label: 'Members',       value: `${members}` },
-                      { label: 'Per round',     value: `${amount || 0} USDT` },
+                      { label: 'Per round',     value: `${amount || 0} USDC` },
                       { label: 'Frequency',     value: freq.label },
-                      { label: 'Pot per round', value: `${pot.toFixed(0)} USDT`, bold: true },
+                      { label: 'Pot per round', value: `${pot.toFixed(0)} USDC`, bold: true },
                       { label: 'Total rounds',  value: `${members}` },
                     ].map((row) => (
                       <View

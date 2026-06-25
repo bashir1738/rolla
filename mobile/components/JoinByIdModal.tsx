@@ -7,7 +7,7 @@ import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 
 import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { AJO_CIRCLE_ABI } from '../constants/abis';
 
-function fmtUSDT(n: bigint) {
+function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 0 });
 }
 
@@ -149,7 +149,7 @@ export function JoinByIdModal({ visible, onClose }: { visible: boolean; onClose:
               <View>
                 <Text className="text-muted text-xs">Contribution</Text>
                 <Text className="text-charcoal font-bold text-sm">
-                  ${fmtUSDT(contributionAmount as bigint)} USDT
+                  ${fmtUSDC(contributionAmount as bigint)} USDC
                 </Text>
               </View>
               <View>

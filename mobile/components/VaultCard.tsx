@@ -5,7 +5,7 @@ import { ProgressBar } from './ProgressBar';
 import { Badge } from './Badge';
 import { VAULT_TIERS, type VaultData } from '../hooks/useVaults';
 
-function fmtUSDT(n: bigint) {
+function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -23,7 +23,7 @@ function lockPct(v: VaultData) {
 
 export function VaultCard({ vault, onClaim }: { vault: VaultData; onClaim: () => void }) {
   const tier = VAULT_TIERS[(['Flex', 'Growth', 'Power'] as const)[vault.tier]];
-  const earned = vault.currentBalanceUSDT - vault.principalUSDT;
+  const earned = vault.currentBalanceUSDC - vault.principalUSDC;
   const pct = lockPct(vault);
 
   return (
@@ -46,13 +46,13 @@ export function VaultCard({ vault, onClaim }: { vault: VaultData; onClaim: () =>
       <View className="flex-row justify-between bg-surface rounded-xl p-3 mb-4">
         <View>
           <Text className="text-muted text-[10px] uppercase tracking-wide mb-1">Current Balance</Text>
-          <Text className="text-charcoal font-black text-lg">${fmtUSDT(vault.currentBalanceUSDT)}</Text>
+          <Text className="text-charcoal font-black text-lg">${fmtUSDC(vault.currentBalanceUSDC)}</Text>
         </View>
         <View className="items-end">
           <Text className="text-muted text-[10px] uppercase tracking-wide mb-1">Earned</Text>
           <View className="flex-row items-center gap-1">
             <Ionicons name="trending-up" size={14} color="#1A3C2B" />
-            <Text className="text-primary font-black text-lg">+${fmtUSDT(earned)}</Text>
+            <Text className="text-primary font-black text-lg">+${fmtUSDC(earned)}</Text>
           </View>
         </View>
       </View>
@@ -82,7 +82,7 @@ export function VaultCard({ vault, onClaim }: { vault: VaultData; onClaim: () =>
         >
           <Ionicons name="cash-outline" size={18} color="white" />
           <Text className="text-white font-bold text-base">
-            Claim ${fmtUSDT(vault.currentBalanceUSDT)}
+            Claim ${fmtUSDC(vault.currentBalanceUSDC)}
           </Text>
         </TouchableOpacity>
       )}

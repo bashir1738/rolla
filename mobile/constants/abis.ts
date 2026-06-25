@@ -69,6 +69,10 @@ export const AJO_CIRCLE_ABI = [
   { type: 'function', name: 'circleCount', stateMutability: 'view',
     inputs: [], outputs: [{ name: '', type: 'uint256' }] },
 
+  { type: 'function', name: 'getUserCircles', stateMutability: 'view',
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256[]' }] },
+
   // Events
   { type: 'event', name: 'CircleCreated',
     inputs: [{ name: 'circleId', type: 'uint256', indexed: true }, { name: 'creator', type: 'address', indexed: true }, { name: 'name', type: 'string', indexed: false }] },
@@ -145,9 +149,9 @@ export const ROLLA_VAULT_ABI = [
 
   // Events
   { type: 'event', name: 'VaultCreated',
-    inputs: [{ name: 'vaultId', type: 'uint256', indexed: true }, { name: 'owner', type: 'address', indexed: true }, { name: 'tier', type: 'uint8', indexed: false }, { name: 'usdtDeposited', type: 'uint256', indexed: false }] },
+    inputs: [{ name: 'vaultId', type: 'uint256', indexed: true }, { name: 'owner', type: 'address', indexed: true }, { name: 'tier', type: 'uint8', indexed: false }, { name: 'usdcDeposited', type: 'uint256', indexed: false }] },
   { type: 'event', name: 'VaultClaimed',
-    inputs: [{ name: 'vaultId', type: 'uint256', indexed: true }, { name: 'owner', type: 'address', indexed: true }, { name: 'usdtValue', type: 'uint256', indexed: false }, { name: 'tokenOut', type: 'address', indexed: false }] },
+    inputs: [{ name: 'vaultId', type: 'uint256', indexed: true }, { name: 'owner', type: 'address', indexed: true }, { name: 'usdcValue', type: 'uint256', indexed: false }, { name: 'tokenOut', type: 'address', indexed: false }] },
 ] as const;
 
 // Uniswap V3 QuoterV2 — quoteExactInputSingle (nonpayable, called via eth_call simulation)
@@ -182,6 +186,9 @@ export const USERNAME_REGISTRY_ABI = [
   { type: 'function', name: 'available', stateMutability: 'view',
     inputs: [{ name: 'name', type: 'string' }],
     outputs: [{ name: '', type: 'bool' }] },
+  { type: 'function', name: 'cooldownEndsAt', stateMutability: 'view',
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }] },
   { type: 'function', name: 'claim',     stateMutability: 'nonpayable',
     inputs: [{ name: 'name', type: 'string' }],
     outputs: [] },

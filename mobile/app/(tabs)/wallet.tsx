@@ -8,23 +8,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useBalance } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { formatUnits } from 'viem';
-import { TransactionItem, type Transaction, type TxType } from '../../components/TransactionItem';
+import { TransactionItem, type TxType } from '../../components/TransactionItem';
 import { useWallet } from '../../providers/WalletContext';
 import { fmtAddr } from '../../hooks/useDisplayName';
 import { ProfileButton } from '../../components/ProfileSidebar';
 import { useProfileSidebar } from '../../contexts/ProfileSidebarContext';
 import { TOKEN_ADDRESSES } from '../../constants/addresses';
-import { useRefresh } from '../../hooks/useRefresh';
+import { useTransactionHistory } from '../../hooks/useTransactionHistory';
 import { SendSheet } from '../../components/SendSheet';
-
-const TRANSACTIONS: Transaction[] = [];
 
 type Filter = 'All' | 'Payouts' | 'Contributions' | 'Vaults';
 const FILTERS: Filter[] = ['All', 'Payouts', 'Contributions', 'Vaults'];
 const FILTER_TYPES: Record<Filter, TxType[]> = {
-  All:           ['payout', 'contribution', 'deposit', 'interest', 'claim'],
+  All:           ['payout', 'contribution', 'deposit', 'interest', 'claim', 'circle_create', 'circle_join'],
   Payouts:       ['payout', 'claim'],
-  Contributions: ['contribution'],
+  Contributions: ['contribution', 'circle_create', 'circle_join'],
   Vaults:        ['deposit', 'interest'],
 };
 const FILTER_ICONS: Record<Filter, React.ComponentProps<typeof Ionicons>['name']> = {
@@ -55,20 +53,12 @@ const TOKENS: TokenDef[] = [
     label: 'Ξ',
   },
   {
-    symbol: 'USDT',
-    name: 'Tether USD',
-    tokenAddress: TOKEN_ADDRESSES.USDT,
-    bg: '#26A17B',
+    symbol: 'USDC',
+    name: 'USD Coin',
+    tokenAddress: TOKEN_ADDRESSES.USDC,
+    bg: '#2775CA',
     fg: '#fff',
     label: '$',
-  },
-  {
-    symbol: 'WETH',
-    name: 'Wrapped ETH',
-    tokenAddress: TOKEN_ADDRESSES.WETH,
-    bg: '#8A6EF0',
-    fg: '#fff',
-    label: 'Ξ',
   },
 ];
 
@@ -86,7 +76,7 @@ function TokenRow({
   const formatted = data
     ? parseFloat(formatUnits(data.value, data.decimals)).toLocaleString('en-US', {
         minimumFractionDigits: 2,
-        maximumFractionDigits: token.symbol === 'USDT' ? 2 : 5,
+        maximumFractionDigits: token.symbol === 'USDC' ? 2 : 5,
       })
     : '0.00';
 
@@ -192,14 +182,22 @@ function AssetsHeader({
 export default function WalletTab() {
   const { isConnected, address, connect } = useWallet();
   const { openSidebar } = useProfileSidebar();
-  const { refreshing, refresh } = useRefresh();
   const [active, setActive] = useState<Filter>('All');
   const [copied, setCopied] = useState(false);
   const [showSend, setShowSend] = useState(false);
 
+  const { txs, refresh: refreshTxs } = useTransactionHistory(address);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await refreshTxs();
+    setRefreshing(false);
+  };
+
   const filtered = useMemo(
-    () => TRANSACTIONS.filter((tx) => FILTER_TYPES[active].includes(tx.type)),
-    [active],
+    () => txs.filter((tx) => FILTER_TYPES[active].includes(tx.type)),
+    [txs, active],
   );
 
   const copyAddress = () => {

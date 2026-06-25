@@ -13,9 +13,6 @@ import { JoinByIdModal } from '../../components/JoinByIdModal';
 import { useWallet } from '../../providers/WalletContext';
 import { useRefresh } from '../../hooks/useRefresh';
 
-function fmtUSDT(n: bigint) {
-  return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2 });
-}
 
 export default function CirclesTab() {
   const { isConnected } = useWallet();

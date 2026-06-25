@@ -8,7 +8,7 @@ import { AJO_CIRCLE_ABI } from '../constants/abis';
 interface CreateCircleParams {
   name: string;
   maxMembers: number;
-  contributionUSDT: number;   // human units, converted to 6-decimal USDT
+  contributionUSDC: number;   // human units, converted to 6-decimal USDC
   frequencySeconds: number;
 }
 
@@ -37,7 +37,7 @@ export function useCreateCircle() {
       setError(null);
       setTxHash(null);
       try {
-        const contribution = parseUnits(String(params.contributionUSDT), 6);
+        const contribution = parseUnits(String(params.contributionUSDC), 6);
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.AJO_CIRCLE,
           abi: AJO_CIRCLE_ABI,

@@ -6,7 +6,8 @@
     "start": "EXPO_OFFLINE=1 expo start",
     "android": "EXPO_OFFLINE=1 expo start --android",
     "ios": "EXPO_OFFLINE=1 expo start --ios",
-    "web": "EXPO_OFFLINE=1 expo start --web"
+    "web": "EXPO_OFFLINE=1 expo start --web",
+    "build:android": "JAVA_HOME=/snap/android-studio/232/jbr PATH=/snap/android-studio/232/jbr/bin:$PATH NODE_OPTIONS='--dns-result-order=ipv4first' eas build --platform android --profile preview"
   },
   "dependencies": {
     "@ethersproject/shims": "^5.8.0",
@@ -19,28 +20,28 @@
     "babel-preset-expo": "^54.0.11",
     "expo": "~54.0.34",
     "expo-application": "~7.0.8",
-    "expo-auth-session": "^56.0.14",
-    "expo-background-fetch": "^56.0.19",
+    "expo-auth-session": "~7.0.11",
+    "expo-background-fetch": "~14.0.9",
     "expo-constants": "~18.0.13",
-    "expo-crypto": "^56.0.4",
+    "expo-crypto": "~15.0.9",
     "expo-dev-client": "~6.0.21",
     "expo-font": "~14.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-local-authentication": "~17.0.8",
-    "expo-notifications": "^56.0.18",
+    "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.23",
     "expo-secure-store": "~15.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
-    "expo-task-manager": "^56.0.19",
+    "expo-task-manager": "~14.0.9",
     "expo-web-browser": "~15.0.11",
     "fast-text-encoding": "^1.0.6",
     "nativewind": "^4.2.5",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-get-random-values": "^2.0.0",
+    "react-native-get-random-values": "~1.11.0",
     "react-native-modal": "^14.0.0-rc.1",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
@@ -58,5 +59,10 @@
     "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "install": {
+      "exclude": ["react"]
+    }
+  }
 }

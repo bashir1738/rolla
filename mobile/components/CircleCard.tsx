@@ -5,7 +5,7 @@ import { ProgressBar } from './ProgressBar';
 import { Badge } from './Badge';
 import type { CircleData } from '../hooks/useCircles';
 
-function fmtUSDT(n: bigint) {
+function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
@@ -18,6 +18,7 @@ function freqLabel(s: number) {
 }
 
 function nextLabel(ts: number) {
+  if (!ts) return 'Needs members';
   const diff = ts - Date.now() / 1000;
   if (diff < 0) return 'Overdue';
   const d = Math.floor(diff / 86400);
@@ -62,7 +63,7 @@ export function CircleCard({ circle, onPress }: { circle: CircleData; onPress: (
               <Text className="text-muted text-xs">{freqLabel(circle.frequency)}</Text>
               <Text className="text-muted text-xs">·</Text>
               <Ionicons name="cash-outline" size={11} color="#6B7C74" />
-              <Text className="text-muted text-xs">${fmtUSDT(circle.contributionAmount)} USDT</Text>
+              <Text className="text-muted text-xs">${fmtUSDC(circle.contributionAmount)} USDC</Text>
             </View>
           </View>
         </View>
@@ -80,7 +81,7 @@ export function CircleCard({ circle, onPress }: { circle: CircleData; onPress: (
 
       {/* Footer */}
       <View className="flex-row justify-between border-t border-border pt-3">
-        <FooterStat icon="wallet-outline" label="Pool" value={`$${fmtUSDT(circle.poolBalance)}`} />
+        <FooterStat icon="wallet-outline" label="Pool" value={`$${fmtUSDC(circle.poolBalance)}`} />
         <FooterStat icon="people-outline" label="Members" value={`${circle.members.length}/${circle.maxMembers}`} />
         <FooterStat icon="calendar-outline" label="Next payout" value={nextLabel(circle.nextPayoutTimestamp)} />
       </View>

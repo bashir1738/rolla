@@ -113,10 +113,11 @@ export function InviteModal({ visible, circle, onClose }: Props) {
         message:
           `You've been invited to join my Rolla savings circle!\n\n` +
           `Circle: ${circle.name}\n` +
-          `Contribution: $${(Number(circle.contributionAmount) / 1_000_000).toFixed(0)} USDT per round\n` +
+          `Contribution: $${(Number(circle.contributionAmount) / 1_000_000).toFixed(0)} USDC per round\n` +
           `Members: ${circle.members.length}/${circle.maxMembers}\n\n` +
           `Circle ID: ${circle.id}\n\n` +
-          `Download Rolla and enter this Circle ID to join.`,
+          `Download the Rolla app here:\nhttps://rolla-lime.vercel.app/\n\n` +
+          `Once installed, tap "Join" and enter the Circle ID above.`,
       });
     } catch {}
   };

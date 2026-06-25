@@ -7,7 +7,7 @@ import { useQuote } from '../hooks/useQuote';
 import { TOKEN_ADDRESSES } from '../constants/addresses';
 
 const TOKENS = [
-  { symbol: 'USDT', address: TOKEN_ADDRESSES.USDT, decimals: 6, icon: 'cash-outline' as const },
+  { symbol: 'USDC', address: TOKEN_ADDRESSES.USDC, decimals: 6, icon: 'cash-outline' as const },
   { symbol: 'ETH',  address: '0x0000000000000000000000000000000000000000' as `0x${string}`, decimals: 18, icon: 'logo-bitcoin' as const },
   { symbol: 'WETH', address: TOKEN_ADDRESSES.WETH, decimals: 18, icon: 'cube-outline' as const },
 ] as const;
@@ -15,8 +15,8 @@ const TOKENS = [
 const SLIPPAGE_OPTIONS = [0.5, 1, 2];
 
 type PayoutTarget =
-  | { type: 'circle'; circleId: number; availableUSDT: bigint; label: string }
-  | { type: 'vault';  vaultId: number;  availableUSDT: bigint; label: string };
+  | { type: 'circle'; circleId: number; availableUSDC: bigint; label: string }
+  | { type: 'vault';  vaultId: number;  availableUSDC: bigint; label: string };
 
 interface PayoutSheetProps {
   target: PayoutTarget;
@@ -24,7 +24,7 @@ interface PayoutSheetProps {
   onClose: () => void;
 }
 
-function fmtUSDT(n: bigint) {
+function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -36,18 +36,18 @@ export function PayoutSheet({ target, visible, onClose }: PayoutSheetProps) {
   const { claim, txState, txHash, error, reset } = useClaim();
 
   const selectedToken = TOKENS[tokenIdx];
-  const isUSDT = selectedToken.symbol === 'USDT';
+  const isUSDC = selectedToken.symbol === 'USDC';
 
-  // Get live quote when swapping out of USDT
+  // Get live quote when swapping out of USDC
   const { amountOut: tokenOut, isLoading: quoting } = useQuote({
-    tokenIn: TOKEN_ADDRESSES.USDT,
+    tokenIn: TOKEN_ADDRESSES.USDC,
     tokenOut: selectedToken.address,
-    amountIn: target.availableUSDT,
+    amountIn: target.availableUSDC,
     fee: 3000,
-    enabled: !isUSDT && target.availableUSDT > 0n,
+    enabled: !isUSDC && target.availableUSDC > 0n,
   });
 
-  const displayAmount  = isUSDT ? target.availableUSDT : tokenOut;
+  const displayAmount  = isUSDC ? target.availableUSDC : tokenOut;
   const minGuaranteed  = displayAmount * BigInt(Math.round((1 - slippage / 100) * 10000)) / 10000n;
   const displayDecimals = selectedToken.decimals;
 
@@ -122,11 +122,11 @@ export function PayoutSheet({ target, visible, onClose }: PayoutSheetProps) {
             />
           ) : (
             <>
-              {/* Available USDT */}
+              {/* Available USDC */}
               <View className="bg-primary/5 border border-primary/15 rounded-2xl p-5 items-center">
                 <Text className="text-muted text-xs uppercase tracking-widest mb-1">Available</Text>
-                <Text className="text-primary text-3xl font-black">${fmtUSDT(target.availableUSDT)}</Text>
-                <Text className="text-muted text-xs mt-1">USDT</Text>
+                <Text className="text-primary text-3xl font-black">${fmtUSDC(target.availableUSDC)}</Text>
+                <Text className="text-muted text-xs mt-1">USDC</Text>
               </View>
 
               {/* Token selector */}
@@ -154,7 +154,7 @@ export function PayoutSheet({ target, visible, onClose }: PayoutSheetProps) {
                             {tk.symbol}
                           </Text>
                           <Text className="text-muted text-xs">
-                            {tk.symbol === 'USDT' ? 'Direct transfer — no swap' : `Via Uniswap V3 · ${slippage}% slippage`}
+                            {tk.symbol === 'USDC' ? 'Direct transfer — no swap' : `Via Uniswap V3 · ${slippage}% slippage`}
                           </Text>
                         </View>
                         {isSelected && (
@@ -169,7 +169,7 @@ export function PayoutSheet({ target, visible, onClose }: PayoutSheetProps) {
               </View>
 
               {/* Swap preview */}
-              {!isUSDT && (
+              {!isUSDC && (
                 <View className="bg-card border border-border rounded-2xl p-4 gap-2">
                   <View className="flex-row justify-between">
                     <Text className="text-muted text-sm">You receive</Text>

@@ -8,13 +8,13 @@ import { TxStateView } from './TxStateView';
 import { TOKEN_ADDRESSES } from '../constants/addresses';
 
 const TOKENS = [
-  { symbol: 'USDT', address: TOKEN_ADDRESSES.USDT, decimals: 6 },
+  { symbol: 'USDC', address: TOKEN_ADDRESSES.USDC, decimals: 6 },
   { symbol: 'ETH',  address: '0x0000000000000000000000000000000000000000' as `0x${string}`, decimals: 18 },
 ];
 
 const SLIPPAGE = [0.5, 1, 2];
 
-function fmtUSDT(n: bigint) {
+function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toFixed(2);
 }
 
@@ -34,15 +34,15 @@ export function DepositModal({ tier, visible, onClose }: {
 
   const token = TOKENS[tokenIdx];
   const amountIn = rawAmt ? BigInt(Math.floor(parseFloat(rawAmt) * 10 ** token.decimals)) : 0n;
-  const { amountOut: usdtOut, isLoading: quoting } = useQuote({
-    tokenIn: token.address, tokenOut: TOKEN_ADDRESSES.USDT,
-    amountIn, fee: 3000, enabled: amountIn > 0n && token.symbol !== 'USDT',
+  const { amountOut: usdcOut, isLoading: quoting } = useQuote({
+    tokenIn: token.address, tokenOut: TOKEN_ADDRESSES.USDC,
+    amountIn, fee: 3000, enabled: amountIn > 0n && token.symbol !== 'USDC',
   });
 
-  const displayUSDT = token.symbol === 'USDT' ? amountIn : usdtOut;
-  const minUSDT = displayUSDT * BigInt(Math.round((1 - slippage / 100) * 10000)) / 10000n;
-  const principal = Number(displayUSDT) / 1_000_000;
-  const meetsMin = principal >= t.minUSDT;
+  const displayUSDC = token.symbol === 'USDC' ? amountIn : usdcOut;
+  const minUSDC = displayUSDC * BigInt(Math.round((1 - slippage / 100) * 10000)) / 10000n;
+  const principal = Number(displayUSDC) / 1_000_000;
+  const meetsMin = principal >= t.minUSDC;
 
   const handleClose = () => { reset(); setRawAmt(''); onClose(); };
 
@@ -116,7 +116,7 @@ export function DepositModal({ tier, visible, onClose }: {
               <View className="bg-card border border-border rounded-2xl px-4 py-4">
                 <TextInput
                   className="text-charcoal text-2xl "
-                  placeholder={`Min ${t.minUSDT} USDT`}
+                  placeholder={`Min ${t.minUSDC} USDC`}
                   placeholderTextColor="#6B7C74"
                   value={rawAmt}
                   onChangeText={setRawAmt}
@@ -130,7 +130,7 @@ export function DepositModal({ tier, visible, onClose }: {
                   <TouchableOpacity
                     key={m}
                     className="flex-1 bg-card border border-border rounded-xl py-2.5 items-center"
-                    onPress={() => setRawAmt(String(t.minUSDT * m))}
+                    onPress={() => setRawAmt(String(t.minUSDC * m))}
                   >
                     <Text className="text-charcoal font-semibold text-sm">
                       {m === 1 ? 'Min' : `${m}×`}
@@ -140,7 +140,7 @@ export function DepositModal({ tier, visible, onClose }: {
               </View>
 
               {/* Swap quote */}
-              {amountIn > 0n && token.symbol !== 'USDT' && (
+              {amountIn > 0n && token.symbol !== 'USDC' && (
                 <View className="bg-primary/5 border border-primary/15 rounded-xl p-4 gap-1.5">
                   <View className="flex-row justify-between">
                     <Text className="text-muted text-sm">You deposit</Text>
@@ -149,12 +149,12 @@ export function DepositModal({ tier, visible, onClose }: {
                   <View className="flex-row justify-between">
                     <Text className="text-muted text-sm">Estimated receive</Text>
                     <Text className="text-charcoal font-semibold text-sm">
-                      {quoting ? '…' : `~${fmtUSDT(usdtOut)} USDT`}
+                      {quoting ? '…' : `~${fmtUSDC(usdcOut)} USDC`}
                     </Text>
                   </View>
                   <View className="flex-row justify-between">
                     <Text className="text-muted text-xs">Min guaranteed ({slippage}%)</Text>
-                    <Text className="text-muted text-xs">{fmtUSDT(minUSDT)} USDT</Text>
+                    <Text className="text-muted text-xs">{fmtUSDC(minUSDC)} USDC</Text>
                   </View>
                 </View>
               )}
@@ -191,14 +191,14 @@ export function DepositModal({ tier, visible, onClose }: {
                   meetsMin ? 'bg-primary' : 'bg-primary/30'
                 }`}
                 onPress={() => deposit({
-                  tier: t.tier, tokenIn: token.address, amountIn, amountOutMinimum: minUSDT, poolFee: 3000,
+                  tier: t.tier, tokenIn: token.address, amountIn, amountOutMinimum: minUSDC, poolFee: 3000,
                 })}
                 disabled={!meetsMin}
                 accessibilityLabel="Sign and send deposit"
               >
                 <Ionicons name="wallet" size={18} color={meetsMin ? 'white' : 'rgba(255,255,255,0.5)'} />
                 <Text className={`font-bold text-base ${meetsMin ? 'text-white' : 'text-white/50'}`}>
-                  {!meetsMin ? `Min ${t.minUSDT} USDT` : 'Sign & Send →'}
+                  {!meetsMin ? `Min ${t.minUSDC} USDC` : 'Sign & Send →'}
                 </Text>
               </TouchableOpacity>
             </>

@@ -13,7 +13,7 @@ import { useWallet } from '../../providers/WalletContext';
 import { useDisplayName } from '../../hooks/useDisplayName';
 import { useRefresh } from '../../hooks/useRefresh';
 
-function fmtUSDT(n: bigint) {
+function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2 });
 }
 
@@ -40,6 +40,9 @@ export default function HomeTab() {
             <Ionicons name="leaf" size={15} color="#1A3C2B" />
           </View>
           <Text className="text-white font-semibold text-xl tracking-tight">Rolla</Text>
+          {display ? (
+            <Text className="text-white/50 text-sm font-medium">· {display}</Text>
+          ) : null}
         </View>
         <View className="flex-row items-center gap-2">
           <WalletButton />
@@ -54,14 +57,14 @@ export default function HomeTab() {
         </Text>
         <View className="flex-row items-center gap-3 mb-5">
           <Text className="text-white text-5xl font-semibold tracking-tight leading-none">
-            {balanceHidden ? '••••••' : `$${fmtUSDT(totalSaved)}`}
+            {balanceHidden ? '••••••' : `$${fmtUSDC(totalSaved)}`}
           </Text>
           <View className="gap-1.5">
             <TouchableOpacity onPress={() => setBalanceHidden((h) => !h)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
               <Ionicons name={balanceHidden ? 'eye-off-outline' : 'eye-outline'} size={18} color="white" />
             </TouchableOpacity>
             <View className="bg-white/10 rounded-md px-1.5 py-0.5">
-              <Text className="text-white/50 text-xs font-bold">USDT</Text>
+              <Text className="text-white/50 text-xs font-bold">USDC</Text>
             </View>
           </View>
         </View>
@@ -93,7 +96,7 @@ export default function HomeTab() {
             <View className="flex-row items-center gap-2">
               <Ionicons name="gift-outline" size={18} color="#D4A017" />
               <Text className="text-charcoal font-semibold text-sm flex-1">
-                Your payout is ready — claim ${fmtUSDT(pendingPayouts[0].poolBalance)} USDT from{' '}
+                Your payout is ready — claim ${fmtUSDC(pendingPayouts[0].poolBalance)} USDC from{' '}
                 {pendingPayouts[0].name}
               </Text>
             </View>

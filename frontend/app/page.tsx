@@ -5,6 +5,7 @@ import { CirclesShowcase } from "../components/CirclesShowcase";
 import { Features } from "../components/Features";
 import { VaultTiers } from "../components/VaultTiers";
 import { HowItWorks } from "../components/HowItWorks";
+import { UsernameSection } from "../components/UsernameSection";
 import { Security } from "../components/Security";
 import { CTA } from "../components/CTA";
 import { Footer } from "../components/Footer";
@@ -23,6 +24,7 @@ export default function Home() {
         <Features />
         <VaultTiers />
         <HowItWorks />
+        <UsernameSection />
         <Security />
         <CTA />
       </main>

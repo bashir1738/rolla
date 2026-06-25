@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core';
 import type { TxState } from '../providers/WalletContext';
 import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { ROLLA_VAULT_ABI } from '../constants/abis';
+import { wagmiConfig } from '../providers/WagmiProvider';
 
 const ERC20_APPROVE_ABI = [
   { type: 'function', name: 'approve', stateMutability: 'nonpayable',
@@ -47,13 +49,14 @@ export function useDeposit() {
       const isNative = params.tokenIn === '0x0000000000000000000000000000000000000000';
 
       if (!isNative) {
-        // Approve vault to spend token (this tx is awaited but not receipt-tracked)
-        await writeContractAsync({
+        const approveHash = await writeContractAsync({
           address: params.tokenIn,
           abi: ERC20_APPROVE_ABI,
           functionName: 'approve',
           args: [CONTRACT_ADDRESSES.ROLLA_VAULT, params.amountIn],
         });
+        // Wait for approve to be mined before deposit calls transferFrom
+        await waitForTransactionReceipt(wagmiConfig, { hash: approveHash });
       }
 
       const hash = await writeContractAsync({

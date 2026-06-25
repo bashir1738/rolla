@@ -5,6 +5,7 @@ const LINKS = [
   { label: "Circles", href: "#circles" },
   { label: "Save & Earn", href: "#vaults" },
   { label: "How it works", href: "#how" },
+  { label: "Username", href: "#username" },
   { label: "Security", href: "#security" },
 ];
 

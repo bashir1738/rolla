@@ -13,7 +13,7 @@ import { USERNAME_REGISTRY_ABI } from '../constants/abis';
 import { fmtAddr } from '../hooks/useDisplayName';
 import type { CircleData } from '../hooks/useCircles';
 
-function fmtUSDT(n: bigint) {
+function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 0 });
 }
 
@@ -99,9 +99,9 @@ export function CircleDetail({ circle, visible, onClose }: {
           {/* Stats */}
           <View className="flex-row bg-card mx-4 rounded-2xl p-4 mb-4">
             {[
-              { label: 'Pool Balance', value: `$${fmtUSDT(circle.poolBalance)}` },
+              { label: 'Pool Balance', value: `$${fmtUSDC(circle.poolBalance)}` },
               { label: 'Your Position', value: `#${circle.myPosition || '–'}` },
-              { label: 'Next Payout', value: new Date(circle.nextPayoutTimestamp * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) },
+              { label: 'Next Payout', value: circle.nextPayoutTimestamp ? new Date(circle.nextPayoutTimestamp * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'On activation' },
             ].map((s, i) => (
               <React.Fragment key={i}>
                 {i > 0 && <View className="w-px bg-border" />}
@@ -158,14 +158,14 @@ export function CircleDetail({ circle, visible, onClose }: {
             <TouchableOpacity
               className="bg-primary rounded-full py-4 items-center flex-row justify-center gap-2"
               onPress={() => claim.claim({
-                type: 'circle', circleId: circle.id, tokenOut: TOKEN_ADDRESSES.USDT,
+                type: 'circle', circleId: circle.id, tokenOut: TOKEN_ADDRESSES.USDC,
                 amountOutMinimum: circle.poolBalance * 99n / 100n, poolFee: 3000,
               })}
               accessibilityLabel="Claim payout"
             >
               <Ionicons name="cash" size={18} color="white" />
               <Text className="text-white font-bold text-base">
-                🎉 Claim ${fmtUSDT(circle.poolBalance)} USDT
+                🎉 Claim ${fmtUSDC(circle.poolBalance)} USDC
               </Text>
             </TouchableOpacity>
           )}
@@ -173,7 +173,7 @@ export function CircleDetail({ circle, visible, onClose }: {
             <TouchableOpacity
               className="bg-primary rounded-full py-4 items-center flex-row justify-center gap-2"
               onPress={() => contribute.contribute({
-                circleId: circle.id, tokenIn: TOKEN_ADDRESSES.USDT,
+                circleId: circle.id, tokenIn: TOKEN_ADDRESSES.USDC,
                 amountIn: circle.contributionAmount,
                 amountOutMinimum: circle.contributionAmount, poolFee: 3000,
               })}
@@ -181,7 +181,7 @@ export function CircleDetail({ circle, visible, onClose }: {
             >
               <Ionicons name="arrow-up-circle" size={18} color="white" />
               <Text className="text-white font-bold text-base">
-                Contribute ${fmtUSDT(circle.contributionAmount)} USDT
+                Contribute ${fmtUSDC(circle.contributionAmount)} USDC
               </Text>
             </TouchableOpacity>
           )}

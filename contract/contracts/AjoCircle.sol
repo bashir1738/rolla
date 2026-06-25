@@ -8,13 +8,13 @@ import "./utils/ReentrancyGuard.sol";
 
 /// @title AjoCircle
 /// @notice Trustless rotating savings circles (ajo / esusu / adashe).
-///         Members contribute a fixed USDT amount each round. When every
+///         Members contribute a fixed USDC amount each round. When every
 ///         member has paid, the pot is released to the current round's
 ///         recipient. Contributions and claims accept any EVM token via
 ///         an atomic Uniswap V3 swap.
 contract AjoCircle is ReentrancyGuard {
     // ─── Immutables ─────────────────────────────────────────────────────────
-    address public immutable USDT;
+    address public immutable USDC;
     address public immutable UNISWAP_ROUTER;
     address public immutable WETH;
     address public immutable owner;
@@ -30,10 +30,10 @@ contract AjoCircle is ReentrancyGuard {
         string name;
         address[] members;
         uint256 maxMembers;
-        uint256 contributionAmount; // USDT (6 decimals)
+        uint256 contributionAmount; // USDC (6 decimals)
         uint256 currentRound;       // 0-indexed; increments after each payout trigger
         uint256 totalRounds;        // == maxMembers
-        uint256 poolBalance;        // USDT held pending claim
+        uint256 poolBalance;        // USDC held pending claim
         uint256 nextPayoutTimestamp;
         uint256 frequency;          // seconds between rounds
         CircleStatus status;
@@ -46,6 +46,8 @@ contract AjoCircle is ReentrancyGuard {
     // ─── Storage ─────────────────────────────────────────────────────────────
     mapping(uint256 => Circle) public circles;
     uint256 public circleCount;
+    mapping(uint256 => bool) private _circleIdUsed;
+    mapping(address => uint256[]) private _userCircles;
 
     // ─── Events ──────────────────────────────────────────────────────────────
     event CircleCreated(uint256 indexed circleId, address indexed creator, string name);
@@ -54,7 +56,7 @@ contract AjoCircle is ReentrancyGuard {
     event ContributionMade(
         uint256 indexed circleId,
         address indexed member,
-        uint256 usdtAmount,
+        uint256 usdcAmount,
         uint256 round
     );
     event PayoutReleased(
@@ -66,9 +68,9 @@ contract AjoCircle is ReentrancyGuard {
     event CircleCompleted(uint256 indexed circleId);
 
     // ─── Constructor ─────────────────────────────────────────────────────────
-    constructor(address _usdt, address _router, address _weth) {
-        require(_usdt != address(0) && _router != address(0), "Zero address");
-        USDT = _usdt;
+    constructor(address _usdc, address _router, address _weth) {
+        require(_usdc != address(0) && _router != address(0), "Zero address");
+        USDC = _usdc;
         UNISWAP_ROUTER = _router;
         WETH = _weth;
         owner = msg.sender;
@@ -80,25 +82,26 @@ contract AjoCircle is ReentrancyGuard {
     function createCircle(
         string memory name,
         uint256 maxMembers,
-        uint256 contributionAmountUSDT,
+        uint256 contributionAmountUSDC,
         uint256 frequencyInSeconds
     ) external returns (uint256 circleId) {
         require(bytes(name).length > 0, "Empty name");
         require(maxMembers >= 2 && maxMembers <= 50, "Members: 2-50");
-        require(contributionAmountUSDT > 0, "Zero contribution");
+        require(contributionAmountUSDC > 0, "Zero contribution");
         require(frequencyInSeconds > 0, "Zero frequency");
 
-        circleId = circleCount++;
+        circleId = _generateCircleId();
         Circle storage c = circles[circleId];
         c.name = name;
         c.maxMembers = maxMembers;
-        c.contributionAmount = contributionAmountUSDT;
+        c.contributionAmount = contributionAmountUSDC;
         c.totalRounds = maxMembers;
         c.frequency = frequencyInSeconds;
         c.status = CircleStatus.Recruiting;
 
         c.members.push(msg.sender);
         c.payoutPosition[msg.sender] = 1;
+        _userCircles[msg.sender].push(circleId);
 
         emit CircleCreated(circleId, msg.sender, name);
         emit MemberJoined(circleId, msg.sender);
@@ -115,6 +118,7 @@ contract AjoCircle is ReentrancyGuard {
 
         c.members.push(msg.sender);
         c.payoutPosition[msg.sender] = c.members.length; // 1-indexed
+        _userCircles[msg.sender].push(circleId);
 
         emit MemberJoined(circleId, msg.sender);
 
@@ -129,8 +133,8 @@ contract AjoCircle is ReentrancyGuard {
 
     /// @notice Contribute to the current round.
     ///         Accepts any EVM token (or native ETH when tokenIn == address(0)).
-    ///         Token is swapped to USDT atomically via Uniswap V3.
-    ///         Any excess USDT above contributionAmount is returned to sender.
+    ///         Token is swapped to USDC atomically via Uniswap V3.
+    ///         Any excess USDC above contributionAmount is returned to sender.
     function contribute(
         uint256 circleId,
         address tokenIn,
@@ -149,12 +153,12 @@ contract AjoCircle is ReentrancyGuard {
         require(c.payoutPosition[msg.sender] > 0, "Not a member");
         require(!c.hasPaidThisRound[msg.sender], "Already contributed this round");
 
-        uint256 usdtReceived = _pullAndSwapToUSDT(tokenIn, amountIn, amountOutMinimum, poolFee);
-        require(usdtReceived >= c.contributionAmount, "Insufficient USDT after swap");
+        uint256 usdcReceived = _pullAndSwapToUSDC(tokenIn, amountIn, amountOutMinimum, poolFee);
+        require(usdcReceived >= c.contributionAmount, "Insufficient USDC after swap");
 
         // Return dust above contributionAmount
-        uint256 excess = usdtReceived - c.contributionAmount;
-        if (excess > 0) _safeTransfer(USDT, msg.sender, excess);
+        uint256 excess = usdcReceived - c.contributionAmount;
+        if (excess > 0) _safeTransfer(USDC, msg.sender, excess);
 
         // Effects
         c.hasPaidThisRound[msg.sender] = true;
@@ -171,7 +175,7 @@ contract AjoCircle is ReentrancyGuard {
     // ─── External: Claim Payout ──────────────────────────────────────────────
 
     /// @notice Current round's recipient claims the pot.
-    ///         tokenOut == USDT returns USDT directly; any other address swaps to that token.
+    ///         tokenOut == USDC returns USDC directly; any other address swaps to that token.
     function claimPayout(
         uint256 circleId,
         address tokenOut,
@@ -196,7 +200,7 @@ contract AjoCircle is ReentrancyGuard {
         emit PayoutReleased(circleId, recipient, payout, roundIdx);
 
         // Send payout
-        _swapUSDTAndSend(tokenOut, payout, amountOutMinimum, poolFee, recipient);
+        _swapUSDCAndSend(tokenOut, payout, amountOutMinimum, poolFee, recipient);
 
         // If all rounds complete, close the circle
         if (c.currentRound == c.totalRounds) {
@@ -265,6 +269,10 @@ contract AjoCircle is ReentrancyGuard {
         return circles[circleId].members.length;
     }
 
+    function getUserCircles(address user) external view returns (uint256[] memory) {
+        return _userCircles[user];
+    }
+
     // ─── Admin ───────────────────────────────────────────────────────────────
 
     /// @notice Rescue ETH accidentally sent directly to the contract.
@@ -291,15 +299,15 @@ contract AjoCircle is ReentrancyGuard {
         }
     }
 
-    /// @dev Pulls tokenIn from msg.sender and returns the USDT amount received.
-    function _pullAndSwapToUSDT(
+    /// @dev Pulls tokenIn from msg.sender and returns the USDC amount received.
+    function _pullAndSwapToUSDC(
         address tokenIn,
         uint256 amountIn,
         uint256 amountOutMinimum,
         uint24 poolFee
-    ) internal returns (uint256 usdtReceived) {
-        if (tokenIn == USDT) {
-            _safeTransferFrom(USDT, msg.sender, address(this), amountIn);
+    ) internal returns (uint256 usdcReceived) {
+        if (tokenIn == USDC) {
+            _safeTransferFrom(USDC, msg.sender, address(this), amountIn);
             return amountIn;
         }
 
@@ -309,7 +317,7 @@ contract AjoCircle is ReentrancyGuard {
             require(msg.value == amountIn, "ETH amount mismatch");
             params = ISwapRouter.ExactInputSingleParams({
                 tokenIn: WETH,
-                tokenOut: USDT,
+                tokenOut: USDC,
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp + 15 minutes,
@@ -317,13 +325,13 @@ contract AjoCircle is ReentrancyGuard {
                 amountOutMinimum: amountOutMinimum,
                 sqrtPriceLimitX96: 0
             });
-            usdtReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle{value: amountIn}(params);
+            usdcReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle{value: amountIn}(params);
         } else {
             _safeTransferFrom(tokenIn, msg.sender, address(this), amountIn);
             _safeApprove(tokenIn, UNISWAP_ROUTER, amountIn);
             params = ISwapRouter.ExactInputSingleParams({
                 tokenIn: tokenIn,
-                tokenOut: USDT,
+                tokenOut: USDC,
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp + 15 minutes,
@@ -331,19 +339,19 @@ contract AjoCircle is ReentrancyGuard {
                 amountOutMinimum: amountOutMinimum,
                 sqrtPriceLimitX96: 0
             });
-            usdtReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle(params);
+            usdcReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle(params);
         }
     }
 
-    function _swapUSDTAndSend(
+    function _swapUSDCAndSend(
         address tokenOut,
-        uint256 usdtAmount,
+        uint256 usdcAmount,
         uint256 amountOutMinimum,
         uint24 poolFee,
         address recipient
     ) internal {
-        if (tokenOut == USDT) {
-            _safeTransfer(USDT, recipient, usdtAmount);
+        if (tokenOut == USDC) {
+            _safeTransfer(USDC, recipient, usdcAmount);
             return;
         }
 
@@ -351,14 +359,14 @@ contract AjoCircle is ReentrancyGuard {
         address effectiveOut = wantNativeETH ? WETH : tokenOut;
         address swapRecipient = wantNativeETH ? address(this) : recipient;
 
-        _safeApprove(USDT, UNISWAP_ROUTER, usdtAmount);
+        _safeApprove(USDC, UNISWAP_ROUTER, usdcAmount);
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-            tokenIn: USDT,
+            tokenIn: USDC,
             tokenOut: effectiveOut,
             fee: poolFee,
             recipient: swapRecipient,
             deadline: block.timestamp + 15 minutes,
-            amountIn: usdtAmount,
+            amountIn: usdcAmount,
             amountOutMinimum: amountOutMinimum,
             sqrtPriceLimitX96: 0
         });
@@ -369,6 +377,18 @@ contract AjoCircle is ReentrancyGuard {
             (bool ok, ) = recipient.call{value: amountOut}("");
             require(ok, "ETH transfer failed");
         }
+    }
+
+    // ─── ID Generation ───────────────────────────────────────────────────────
+
+    /// @dev Generates a unique 6-digit circle ID (100000–999999).
+    function _generateCircleId() internal returns (uint256 id) {
+        id = (uint256(keccak256(abi.encodePacked(block.prevrandao, msg.sender, circleCount++))) % 900000) + 100000;
+        // Collision resolution (statistically near-impossible at scale)
+        while (_circleIdUsed[id]) {
+            id = (id % 999999) + 100000;
+        }
+        _circleIdUsed[id] = true;
     }
 
     // ─── Safe Token Helpers ──────────────────────────────────────────────────

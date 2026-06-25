@@ -14,9 +14,9 @@ import { useRefresh } from '../../hooks/useRefresh';
 
 const TIER_KEYS: VaultTier[] = ['Flex', 'Growth', 'Power'];
 const TIER_DESCS: Record<VaultTier, string> = {
-  Flex:   'No lock · Min 10 USDT',
-  Growth: '90-day lock · Min 100 USDT',
-  Power:  '365-day lock · Min 500 USDT',
+  Flex:   'No lock · Min 10 USDC',
+  Growth: '90-day lock · Min 100 USDC',
+  Power:  '365-day lock · Min 500 USDC',
 };
 
 export default function SaveTab() {
@@ -92,7 +92,7 @@ export default function SaveTab() {
             <Text className="text-primary font-semibold text-sm">How it works</Text>
           </View>
           <Text className="text-muted text-xs leading-5">
-            Your deposit is converted to USDT and supplied to Aave V3. Yield accrues automatically.
+            Your deposit is converted to USDC and supplied to Aave V3. Yield accrues automatically.
             Claim anytime (Flex) or after the lock period (Growth/Power).
           </Text>
         </View>
@@ -126,7 +126,7 @@ export default function SaveTab() {
           target={{
             type: 'vault',
             vaultId: claimVault.id,
-            availableUSDT: claimVault.currentBalanceUSDT,
+            availableUSDC: claimVault.currentBalanceUSDC,
             label: `${(['Flex', 'Growth', 'Power'] as const)[claimVault.tier]} Vault #${claimVault.id}`,
           }}
           visible={!!claimVault}

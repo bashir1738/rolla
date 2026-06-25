@@ -8,9 +8,9 @@ export type VaultTier = 'Flex' | 'Growth' | 'Power';
 
 // Fallback values (used until on-chain data loads).
 export const VAULT_TIERS = {
-  Flex:   { tier: 0 as const, aprBps: 450,  lockDays: 0,   minUSDT: 10,  icon: 'water-outline',   label: 'Flex' },
-  Growth: { tier: 1 as const, aprBps: 920,  lockDays: 90,  minUSDT: 100, icon: 'leaf-outline',    label: 'Growth' },
-  Power:  { tier: 2 as const, aprBps: 1480, lockDays: 365, minUSDT: 500, icon: 'flash-outline',   label: 'Power' },
+  Flex:   { tier: 0 as const, aprBps: 450,  lockDays: 0,   minUSDC: 10,  icon: 'water-outline',   label: 'Flex' },
+  Growth: { tier: 1 as const, aprBps: 920,  lockDays: 90,  minUSDC: 100, icon: 'leaf-outline',    label: 'Growth' },
+  Power:  { tier: 2 as const, aprBps: 1480, lockDays: 365, minUSDC: 500, icon: 'flash-outline',   label: 'Power' },
 } as const;
 
 const TIERS = [0, 1, 2] as const;
@@ -33,7 +33,7 @@ export function useVaultTiersFromChain() {
 
   return useMemo(() => {
     if (!data) return VAULT_TIERS;
-    type Mutable = { tier: 0|1|2; aprBps: number; lockDays: number; minUSDT: number; icon: string; label: string };
+    type Mutable = { tier: 0|1|2; aprBps: number; lockDays: number; minUSDC: number; icon: string; label: string };
     const result: Record<VaultTier, Mutable> = {
       Flex:   { ...VAULT_TIERS.Flex },
       Growth: { ...VAULT_TIERS.Growth },
@@ -44,7 +44,7 @@ export function useVaultTiersFromChain() {
       const lock = data[t * 3 + 1]?.result as bigint | undefined;
       const apr  = data[t * 3 + 2]?.result as bigint | undefined;
       const key  = TIER_KEYS[t];
-      if (min)  result[key].minUSDT  = Number(min)  / 1_000_000;
+      if (min)  result[key].minUSDC  = Number(min)  / 1_000_000;
       if (lock) result[key].lockDays = Number(lock) / 86_400;
       if (apr)  result[key].aprBps   = Number(apr);
     });
@@ -56,8 +56,8 @@ export interface VaultData {
   id: number;
   owner: string;
   tier: 0 | 1 | 2;
-  principalUSDT: bigint;
-  currentBalanceUSDT: bigint;
+  principalUSDC: bigint;
+  currentBalanceUSDC: bigint;
   depositTimestamp: number;
   maturityTimestamp: number;
   lockDuration: number;
@@ -108,7 +108,7 @@ export function useVaults() {
       const matured = Boolean(data[i * 3 + 2]?.result);
       if (!v) return;
 
-      const [owner, tier, principalUSDT, , depositTimestamp, maturityTimestamp, lockDuration, claimed] =
+      const [owner, tier, principalUSDC, , depositTimestamp, maturityTimestamp, lockDuration, claimed] =
         v as [string, number, bigint, bigint, bigint, bigint, bigint, boolean];
 
       if (claimed) return; // hide claimed vaults
@@ -117,8 +117,8 @@ export function useVaults() {
         id: Number(id),
         owner,
         tier: Number(tier) as 0 | 1 | 2,
-        principalUSDT,
-        currentBalanceUSDT: balance,
+        principalUSDC,
+        currentBalanceUSDC: balance,
         depositTimestamp: Number(depositTimestamp),
         maturityTimestamp: Number(maturityTimestamp),
         lockDuration: Number(lockDuration),

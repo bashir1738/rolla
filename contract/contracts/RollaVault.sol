@@ -4,39 +4,28 @@ pragma solidity ^0.8.20;
 import "./interfaces/IERC20.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/ISwapRouter.sol";
-import "./interfaces/IPool.sol";
-import "./interfaces/IAToken.sol";
 import "./utils/ReentrancyGuard.sol";
 
 /// @title RollaVault
-/// @notice Individual yield-bearing savings vaults.
-///         User deposits any EVM token → swapped to USDT → deployed to Aave V3.
-///         Three lock tiers (Flex / Growth / Power) with increasing APR targets.
-///         On maturity, user claims principal + Aave yield in USDT or any EVM token.
+/// @notice Individual savings vaults with lock tiers.
+///         User deposits any EVM token → swapped to USDC → held in vault.
+///         Three lock tiers (Flex / Growth / Power) with increasing lock periods.
+///         On maturity, user claims in USDC or any EVM token.
 contract RollaVault is ReentrancyGuard {
-    // ─── Constants ───────────────────────────────────────────────────────────
-    uint256 private constant RAY = 1e27;
-
     // ─── Immutables ──────────────────────────────────────────────────────────
-    address public immutable USDT;
+    address public immutable USDC;
     address public immutable UNISWAP_ROUTER;
-    address public immutable AAVE_POOL;
-    address public immutable A_USDT;
     address public immutable WETH;
     address public immutable owner;
 
     // ─── Types ───────────────────────────────────────────────────────────────
-    enum VaultTier {
-        Flex,   // 4.5% APR target, no lock, min 10 USDT
-        Growth, // 9.2% APR target, 90-day lock, min 100 USDT
-        Power   // 14.8% APR target, 365-day lock, min 500 USDT
-    }
+    enum VaultTier { Flex, Growth, Power }
 
     struct Vault {
         address owner;
         VaultTier tier;
-        uint256 principalUSDT;
-        uint256 aTokenShares;
+        uint256 principalUSDC;
+        uint256 aTokenShares; // reserved for future mainnet Aave integration
         uint256 depositTimestamp;
         uint256 maturityTimestamp;
         uint256 lockDuration;
@@ -54,38 +43,14 @@ contract RollaVault is ReentrancyGuard {
     uint256 public vaultCount;
 
     // ─── Events ──────────────────────────────────────────────────────────────
-    event VaultCreated(
-        uint256 indexed vaultId,
-        address indexed owner,
-        VaultTier tier,
-        uint256 usdtDeposited
-    );
-    event VaultClaimed(
-        uint256 indexed vaultId,
-        address indexed owner,
-        uint256 usdtValue,
-        address tokenOut
-    );
+    event VaultCreated(uint256 indexed vaultId, address indexed owner, VaultTier tier, uint256 usdcDeposited);
+    event VaultClaimed(uint256 indexed vaultId, address indexed owner, uint256 usdcValue, address tokenOut);
 
     // ─── Constructor ─────────────────────────────────────────────────────────
-    constructor(
-        address _usdt,
-        address _router,
-        address _aavePool,
-        address _aUsdt,
-        address _weth
-    ) {
-        require(
-            _usdt != address(0) &&
-            _router != address(0) &&
-            _aavePool != address(0) &&
-            _aUsdt != address(0),
-            "Zero address"
-        );
-        USDT = _usdt;
+    constructor(address _usdc, address _router, address _weth) {
+        require(_usdc != address(0) && _router != address(0), "Zero address");
+        USDC = _usdc;
         UNISWAP_ROUTER = _router;
-        AAVE_POOL = _aavePool;
-        A_USDT = _aUsdt;
         WETH = _weth;
         owner = msg.sender;
     }
@@ -99,19 +64,13 @@ contract RollaVault is ReentrancyGuard {
         uint256 amountOutMinimum,
         uint24 poolFee
     ) external payable nonReentrant returns (uint256 vaultId) {
-        // Reject accidental ETH on ERC20 paths
         if (tokenIn != address(0)) {
             require(msg.value == 0, "ETH not accepted for ERC20 path");
         }
 
         uint256 tierIdx = uint256(tier);
-        uint256 usdtAmount = _pullAndSwapToUSDT(tokenIn, amountIn, amountOutMinimum, poolFee);
-        require(usdtAmount >= minDeposits[tierIdx], "Below tier minimum");
-
-        uint256 scaledBefore = IAToken(A_USDT).scaledBalanceOf(address(this));
-        _safeApprove(USDT, AAVE_POOL, usdtAmount);
-        IPool(AAVE_POOL).supply(USDT, usdtAmount, address(this), 0);
-        uint256 scaledAfter = IAToken(A_USDT).scaledBalanceOf(address(this));
+        uint256 usdcAmount = _pullAndSwapToUSDC(tokenIn, amountIn, amountOutMinimum, poolFee);
+        require(usdcAmount >= minDeposits[tierIdx], "Below tier minimum");
 
         uint256 lockDuration = lockDurations[tierIdx];
 
@@ -119,14 +78,13 @@ contract RollaVault is ReentrancyGuard {
         Vault storage v = vaults[vaultId];
         v.owner = msg.sender;
         v.tier = tier;
-        v.principalUSDT = usdtAmount;
-        v.aTokenShares = scaledAfter - scaledBefore;
+        v.principalUSDC = usdcAmount;
         v.depositTimestamp = block.timestamp;
         v.lockDuration = lockDuration;
         v.maturityTimestamp = lockDuration == 0 ? block.timestamp : block.timestamp + lockDuration;
 
         _userVaults[msg.sender].push(vaultId);
-        emit VaultCreated(vaultId, msg.sender, tier, usdtAmount);
+        emit VaultCreated(vaultId, msg.sender, tier, usdcAmount);
     }
 
     // ─── External: Claim ─────────────────────────────────────────────────────
@@ -148,13 +106,9 @@ contract RollaVault is ReentrancyGuard {
 
         v.claimed = true;
 
-        // Use type(uint256).max to withdraw the full scaled balance, avoiding
-        // 1-wei rounding issues when Aave recomputes the amount internally.
-        uint256 withdrawn = IPool(AAVE_POOL).withdraw(USDT, type(uint256).max, address(this));
-
-        emit VaultClaimed(vaultId, msg.sender, withdrawn, tokenOut);
-
-        _swapUSDTAndSend(tokenOut, withdrawn, amountOutMinimum, poolFee, msg.sender);
+        uint256 balance = v.principalUSDC;
+        emit VaultClaimed(vaultId, msg.sender, balance, tokenOut);
+        _swapUSDCAndSend(tokenOut, balance, amountOutMinimum, poolFee, msg.sender);
     }
 
     // ─── View Functions ──────────────────────────────────────────────────────
@@ -162,19 +116,16 @@ contract RollaVault is ReentrancyGuard {
     function getVaultBalance(uint256 vaultId) external view returns (uint256) {
         Vault storage v = vaults[vaultId];
         if (v.claimed) return 0;
-        uint256 income = IPool(AAVE_POOL).getReserveNormalizedIncome(USDT);
-        return (v.aTokenShares * income) / RAY;
+        return v.principalUSDC;
     }
 
     function getProjectedEarnings(uint256 vaultId, uint256 atTimestamp)
-        external
-        view
-        returns (uint256 earnings)
+        external view returns (uint256)
     {
         Vault storage v = vaults[vaultId];
         if (v.claimed || atTimestamp <= v.depositTimestamp) return 0;
         uint256 elapsed = atTimestamp - v.depositTimestamp;
-        return (v.principalUSDT * aprBps[uint256(v.tier)] * elapsed) / (365 days * 10_000);
+        return (v.principalUSDC * aprBps[uint256(v.tier)] * elapsed) / (365 days * 10_000);
     }
 
     function isMatured(uint256 vaultId) external view returns (bool) {
@@ -191,7 +142,6 @@ contract RollaVault is ReentrancyGuard {
 
     // ─── Admin ───────────────────────────────────────────────────────────────
 
-    /// @notice Rescue ETH accidentally sent directly to the contract.
     function rescueETH() external {
         require(msg.sender == owner, "Not owner");
         uint256 bal = address(this).balance;
@@ -202,14 +152,14 @@ contract RollaVault is ReentrancyGuard {
 
     // ─── Internal ────────────────────────────────────────────────────────────
 
-    function _pullAndSwapToUSDT(
+    function _pullAndSwapToUSDC(
         address tokenIn,
         uint256 amountIn,
         uint256 amountOutMinimum,
         uint24 poolFee
-    ) internal returns (uint256 usdtReceived) {
-        if (tokenIn == USDT) {
-            _safeTransferFrom(USDT, msg.sender, address(this), amountIn);
+    ) internal returns (uint256 usdcReceived) {
+        if (tokenIn == USDC) {
+            _safeTransferFrom(USDC, msg.sender, address(this), amountIn);
             return amountIn;
         }
 
@@ -219,7 +169,7 @@ contract RollaVault is ReentrancyGuard {
             require(msg.value == amountIn, "ETH amount mismatch");
             params = ISwapRouter.ExactInputSingleParams({
                 tokenIn: WETH,
-                tokenOut: USDT,
+                tokenOut: USDC,
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp + 15 minutes,
@@ -227,13 +177,13 @@ contract RollaVault is ReentrancyGuard {
                 amountOutMinimum: amountOutMinimum,
                 sqrtPriceLimitX96: 0
             });
-            usdtReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle{value: amountIn}(params);
+            usdcReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle{value: amountIn}(params);
         } else {
             _safeTransferFrom(tokenIn, msg.sender, address(this), amountIn);
             _safeApprove(tokenIn, UNISWAP_ROUTER, amountIn);
             params = ISwapRouter.ExactInputSingleParams({
                 tokenIn: tokenIn,
-                tokenOut: USDT,
+                tokenOut: USDC,
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp + 15 minutes,
@@ -241,19 +191,19 @@ contract RollaVault is ReentrancyGuard {
                 amountOutMinimum: amountOutMinimum,
                 sqrtPriceLimitX96: 0
             });
-            usdtReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle(params);
+            usdcReceived = ISwapRouter(UNISWAP_ROUTER).exactInputSingle(params);
         }
     }
 
-    function _swapUSDTAndSend(
+    function _swapUSDCAndSend(
         address tokenOut,
-        uint256 usdtAmount,
+        uint256 usdcAmount,
         uint256 amountOutMinimum,
         uint24 poolFee,
         address recipient
     ) internal {
-        if (tokenOut == USDT) {
-            _safeTransfer(USDT, recipient, usdtAmount);
+        if (tokenOut == USDC) {
+            _safeTransfer(USDC, recipient, usdcAmount);
             return;
         }
 
@@ -261,14 +211,14 @@ contract RollaVault is ReentrancyGuard {
         address effectiveOut = wantNativeETH ? WETH : tokenOut;
         address swapRecipient = wantNativeETH ? address(this) : recipient;
 
-        _safeApprove(USDT, UNISWAP_ROUTER, usdtAmount);
+        _safeApprove(USDC, UNISWAP_ROUTER, usdcAmount);
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-            tokenIn: USDT,
+            tokenIn: USDC,
             tokenOut: effectiveOut,
             fee: poolFee,
             recipient: swapRecipient,
             deadline: block.timestamp + 15 minutes,
-            amountIn: usdtAmount,
+            amountIn: usdcAmount,
             amountOutMinimum: amountOutMinimum,
             sqrtPriceLimitX96: 0
         });
@@ -284,25 +234,19 @@ contract RollaVault is ReentrancyGuard {
     // ─── Safe Token Helpers ──────────────────────────────────────────────────
 
     function _safeTransfer(address token, address to, uint256 amount) internal {
-        (bool ok, bytes memory data) = token.call(
-            abi.encodeWithSelector(0xa9059cbb, to, amount)
-        );
+        (bool ok, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, amount));
         require(ok && (data.length == 0 || abi.decode(data, (bool))), "Transfer failed");
     }
 
     function _safeTransferFrom(address token, address from, address to, uint256 amount) internal {
-        (bool ok, bytes memory data) = token.call(
-            abi.encodeWithSelector(0x23b872dd, from, to, amount)
-        );
+        (bool ok, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, to, amount));
         require(ok && (data.length == 0 || abi.decode(data, (bool))), "TransferFrom failed");
     }
 
     function _safeApprove(address token, address spender, uint256 amount) internal {
         (bool ok0, ) = token.call(abi.encodeWithSelector(0x095ea7b3, spender, 0));
         require(ok0, "Approve reset failed");
-        (bool ok1, bytes memory d1) = token.call(
-            abi.encodeWithSelector(0x095ea7b3, spender, amount)
-        );
+        (bool ok1, bytes memory d1) = token.call(abi.encodeWithSelector(0x095ea7b3, spender, amount));
         require(ok1 && (d1.length == 0 || abi.decode(d1, (bool))), "Approve failed");
     }
 

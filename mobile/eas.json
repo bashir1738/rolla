@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 14.0.0"
+    "version": ">= 14.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -8,13 +9,28 @@
       "distribution": "internal",
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_MAGIC_API_KEY": "pk_live_39CFEF716454E512",
+        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e"
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_MAGIC_API_KEY": "pk_live_39CFEF716454E512",
+        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_MAGIC_API_KEY": "pk_live_39CFEF716454E512",
+        "EXPO_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/abdabfe7ec854c8cbcfdb520c1d1c29e"
+      }
     }
   },
   "submit": {
