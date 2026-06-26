@@ -106,6 +106,7 @@ function GetAppModal({
             icon={<DownloadIcon className="h-6 w-6" />}
             sub="Android"
             title="Get the APK"
+            href="https://expo.dev/accounts/bashir1738/projects/rolla/builds/988f28ee-9630-47aa-abbb-d046e2aa04d5"
           />
         </div>
 
@@ -125,16 +126,15 @@ function StoreOption({
   icon,
   sub,
   title,
+  href,
 }: {
   icon: ReactNode;
   sub: string;
   title: string;
+  href?: string;
 }) {
-  return (
-    <div
-      aria-disabled="true"
-      className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-5 py-4 opacity-90"
-    >
+  const inner = (
+    <>
       <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white">
         {icon}
       </span>
@@ -145,8 +145,30 @@ function StoreOption({
         <span className="block text-base font-bold text-charcoal">{title}</span>
       </span>
       <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-bold text-[#9a7411]">
-        Coming soon
+        {href ? "Download" : "Coming soon"}
       </span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-5 py-4 transition-opacity hover:opacity-80"
+      >
+        {inner}
+      </a>
+    );
+  }
+
+  return (
+    <div
+      aria-disabled="true"
+      className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-5 py-4 opacity-90"
+    >
+      {inner}
     </div>
   );
 }

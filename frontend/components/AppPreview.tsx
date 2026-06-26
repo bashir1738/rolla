@@ -7,7 +7,7 @@ export function AppPreview() {
   return (
     <div className="relative mx-auto w-[290px] sm:w-[320px]">
       {/* Ambient glow */}
-      <div className="absolute -inset-10 -z-10 rounded-[4rem] bg-accent/10 blur-3xl" />
+      <div className="absolute -inset-10 -z-10 " />
       <div className="absolute -bottom-6 -left-6 -z-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
 
       {/* Side buttons (on the titanium rail) */}

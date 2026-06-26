@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rolla — Technical Overview</title>
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #1a6b4a;
+      --green-lt: #e8f5ee;
+      --gold:    #c9960c;
+      --gold-lt: #fdf7e3;
+      --ink:     #1c1c1c;
+      --muted:   #555;
+      --border:  #d6d6d6;
+      --surface: #f7f7f5;
+      --white:   #ffffff;
+    }
+
+    html { font-size: 11pt; }
+
+    body {
+      font-family: "Georgia", "Times New Roman", serif;
+      color: var(--ink);
+      background: var(--white);
+      line-height: 1.7;
+      padding: 0;
+    }
+
+    /* ── Print Geometry ─────────────────────────────────────────────────── */
+    @page {
+      size: A4;
+      margin: 20mm 18mm 20mm 18mm;
+    }
+
+    @media print {
+      .no-print { display: none !important; }
+      h2 { page-break-before: always; }
+      h2:first-of-type { page-break-before: avoid; }
+      table, .card { page-break-inside: avoid; }
+    }
+
+    @media screen {
+      body { max-width: 820px; margin: 0 auto; padding: 40px 32px; }
+    }
+
+    /* ── Typography ─────────────────────────────────────────────────────── */
+    h1 { font-size: 26pt; font-weight: 700; color: var(--green); letter-spacing: -0.5px; line-height: 1.15; }
+    h2 { font-size: 15pt; font-weight: 700; color: var(--green); margin: 36px 0 12px;
+         padding-bottom: 6px; border-bottom: 2px solid var(--green); }
+    h3 { font-size: 12pt; font-weight: 700; color: var(--ink); margin: 22px 0 8px; }
+    h4 { font-size: 11pt; font-weight: 700; color: var(--muted); margin: 14px 0 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+    p  { margin: 8px 0; color: var(--muted); }
+    strong { color: var(--ink); }
+    a  { color: var(--green); }
+    ul, ol { padding-left: 20px; margin: 8px 0; }
+    li { margin: 4px 0; color: var(--muted); }
+    code {
+      font-family: "JetBrains Mono", "Fira Code", "Courier New", monospace;
+      font-size: 9.5pt;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: var(--ink);
+    }
+
+    /* ── Cover ──────────────────────────────────────────────────────────── */
+    .cover {
+      border: 2px solid var(--green);
+      border-radius: 8px;
+      padding: 36px 40px 32px;
+      margin-bottom: 40px;
+      background: var(--green-lt);
+    }
+    .cover-meta { margin-top: 18px; font-size: 10pt; color: var(--muted); }
+    .cover-meta span { display: inline-block; margin-right: 28px; }
+    .cover-tag {
+      display: inline-block; margin-top: 14px; margin-right: 8px;
+      background: var(--green); color: #fff; border-radius: 20px;
+      padding: 3px 12px; font-size: 9pt; font-family: sans-serif; font-weight: 600;
+    }
+    .cover-sub { margin-top: 12px; font-size: 11.5pt; color: var(--muted); max-width: 540px; }
+
+    /* ── Cards ──────────────────────────────────────────────────────────── */
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin: 14px 0;
+      background: var(--white);
+    }
+    .card-green { background: var(--green-lt); border-color: var(--green); }
+    .card-gold  { background: var(--gold-lt);  border-color: var(--gold); }
+
+    /* ── Tables ─────────────────────────────────────────────────────────── */
+    table {
+      width: 100%; border-collapse: collapse;
+      margin: 12px 0; font-size: 10pt;
+      font-family: "Arial", sans-serif;
+    }
+    thead th {
+      background: var(--green); color: #fff; text-align: left;
+      padding: 8px 12px; font-weight: 700; font-size: 9.5pt;
+    }
+    tbody td {
+      padding: 7px 12px; border-bottom: 1px solid var(--border);
+      vertical-align: top; color: var(--muted);
+    }
+    tbody tr:nth-child(even) td { background: var(--surface); }
+    tbody td:first-child { color: var(--ink); font-weight: 600; }
+
+    /* ── Contract Badge ─────────────────────────────────────────────────── */
+    .contract-block {
+      border-left: 4px solid var(--green);
+      background: var(--surface);
+      padding: 12px 16px;
+      margin: 14px 0;
+      border-radius: 0 6px 6px 0;
+    }
+    .contract-block .label { font-size: 9pt; color: var(--muted); font-family: sans-serif; text-transform: uppercase; letter-spacing: 0.5px; }
+    .contract-block .addr { font-family: monospace; font-size: 10pt; color: var(--green); word-break: break-all; }
+    .contract-block .name { font-weight: 700; font-size: 11.5pt; margin-bottom: 4px; }
+
+    /* ── Flow Diagram ───────────────────────────────────────────────────── */
+    .flow {
+      display: flex; align-items: center; flex-wrap: wrap;
+      gap: 6px; margin: 14px 0;
+    }
+    .flow-step {
+      background: var(--green); color: #fff;
+      border-radius: 20px; padding: 5px 14px;
+      font-size: 9.5pt; font-family: sans-serif; font-weight: 600;
+      white-space: nowrap;
+    }
+    .flow-arrow { color: var(--green); font-size: 16pt; font-weight: 700; }
+
+    /* ── Why Section ────────────────────────────────────────────────────── */
+    .why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media print { .why-grid { grid-template-columns: 1fr 1fr; } }
+    .why-item {
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px 16px; background: var(--white);
+    }
+    .why-item .why-num {
+      font-size: 20pt; font-weight: 700; color: var(--green); line-height: 1;
+      font-family: sans-serif;
+    }
+    .why-item h4 { margin: 4px 0 6px; color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 11pt; }
+    .why-item p  { font-size: 10pt; }
+
+    /* ── Print Button ───────────────────────────────────────────────────── */
+    .print-btn {
+      display: inline-block; margin: 0 0 28px;
+      background: var(--green); color: #fff;
+      border: none; border-radius: 6px;
+      padding: 10px 22px; font-size: 11pt; cursor: pointer;
+      font-family: sans-serif; font-weight: 600;
+    }
+    .print-btn:hover { background: #145a3d; }
+
+    /* ── Divider ────────────────────────────────────────────────────────── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  </style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- COVER                                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <h1>Rolla</h1>
+  <p class="cover-sub">
+    A trustless, on-chain rotating savings platform — from smart contract to mobile app.
+    This document covers the full technical stack, every SDK and package used, and the
+    rationale for building on a public blockchain.
+  </p>
+  <div>
+    <span class="cover-tag">Ethereum Sepolia</span>
+    <span class="cover-tag">Solidity 0.8</span>
+    <span class="cover-tag">React Native / Expo</span>
+    <span class="cover-tag">Viem · Wagmi</span>
+    <span class="cover-tag">Magic SDK</span>
+    <span class="cover-tag">Uniswap V3</span>
+  </div>
+  <div class="cover-meta">
+    <span><strong>Network</strong> — Ethereum Sepolia (Chain ID 11155111)</span>
+    <span><strong>Date</strong> — June 2026</span>
+    <span><strong>Author</strong> — Gbadamosi Bashir Olamide</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 1. EXECUTIVE SUMMARY                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>1. Executive Summary</h2>
+<p>
+  Rolla is a DeFi-native mobile savings platform built on the <em>ajo / esusu / adashe</em>
+  rotating savings model practiced across West Africa and the diaspora. Members pool
+  a fixed contribution each round; the full pot is released to one member per round,
+  rotating until every member has received once.
+</p>
+<p>
+  Three smart contracts deployed on Ethereum Sepolia form the trustless core. A React
+  Native / Expo mobile app (Android) and a Next.js marketing site sit on top. All
+  financial logic — pot custody, payouts, yield tiers, and on-chain identity — lives
+  in immutable Solidity code, not in a company-controlled database.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 2. SMART CONTRACTS                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>2. Smart Contracts</h2>
+<p>
+  All contracts are written in Solidity <code>^0.8.20</code>, compiled and tested with
+  Hardhat, and deployed via Hardhat Ignition. They share no proxy pattern — code is
+  immutable at the addresses below.
+</p>
+
+<!-- AjoCircle -->
+<div class="contract-block">
+  <div class="label">Contract 1 of 3</div>
+  <div class="name">AjoCircle.sol</div>
+  <div class="label">Sepolia address</div>
+  <div class="addr">0x6bba73Fa725357faf03b660F6727799C6B529366</div>
+</div>
+
+<h3>2.1 AjoCircle — Rotating Savings Circles</h3>
+<p>
+  This is the primary product contract. It manages the full lifecycle of a savings
+  circle: recruiting members, collecting contributions, and releasing the pot.
+</p>
+
+<h4>Key Design Decisions</h4>
+<ul>
+  <li><strong>Any EVM token as input.</strong> Members call <code>contribute()</code> with any token (or native ETH).
+      The contract atomically swaps it to USDC via <strong>Uniswap V3 ExactInputSingle</strong> before crediting the pool.
+      Excess USDC above the contribution amount is returned to the sender.</li>
+  <li><strong>Any EVM token as payout output.</strong> The recipient calls <code>claimPayout()</code> specifying their
+      preferred <code>tokenOut</code>. USDC is swapped back via Uniswap V3 before delivery.</li>
+  <li><strong>Deterministic 6-digit IDs.</strong> Circle IDs are derived from <code>keccak256(prevrandao, sender, count)</code>
+      modulo 900000, making them memorable and shareable (e.g., "join circle 483291").</li>
+  <li><strong>Auto-activation.</strong> A circle transitions from <em>Recruiting</em> to <em>Active</em> the moment the
+      last seat is filled — no admin step required.</li>
+  <li><strong>Reentrancy guard.</strong> All external state-changing functions use a custom <code>ReentrancyGuard</code>.</li>
+</ul>
+
+<table>
+  <thead><tr><th>Function</th><th>Who calls it</th><th>What happens on-chain</th></tr></thead>
+  <tbody>
+    <tr><td>createCircle()</td><td>Creator</td><td>Mints a new circle, creator joins at position 1, emits CircleCreated</td></tr>
+    <tr><td>joinCircle()</td><td>Any wallet</td><td>Adds member, emits MemberJoined; auto-activates when full</td></tr>
+    <tr><td>contribute()</td><td>Circle member</td><td>Pulls token → swaps to USDC → credits pool; triggers payout when all paid</td></tr>
+    <tr><td>claimPayout()</td><td>Current round's recipient</td><td>Releases pool to recipient, optionally swapped to desired token; advances round</td></tr>
+    <tr><td>getCircleInfo()</td><td>Read (any)</td><td>Returns full circle state tuple (used by mobile app to render UI)</td></tr>
+    <tr><td>getUserCircles()</td><td>Read (any)</td><td>Returns array of circle IDs for a wallet address</td></tr>
+  </tbody>
+</table>
+
+<!-- RollaVault -->
+<div class="contract-block">
+  <div class="label">Contract 2 of 3</div>
+  <div class="name">RollaVault.sol</div>
+  <div class="label">Sepolia address</div>
+  <div class="addr">0x1Da5E825c273F173da45a0AF3aBf938DA0761342</div>
+</div>
+
+<h3>2.2 RollaVault — Tiered Savings Vaults</h3>
+<p>
+  Provides individual yield-bearing savings vaults. Depositors lock USDC for a chosen
+  tier and earn projected interest proportional to elapsed time and the tier's APR.
+</p>
+
+<table>
+  <thead><tr><th>Tier</th><th>Lock Period</th><th>APR (bps)</th><th>Min Deposit</th></tr></thead>
+  <tbody>
+    <tr><td>Flex (0)</td><td>No lock</td><td>450 bps (4.5%)</td><td>$10 USDC</td></tr>
+    <tr><td>Growth (1)</td><td>90 days</td><td>920 bps (9.2%)</td><td>$100 USDC</td></tr>
+    <tr><td>Power (2)</td><td>365 days</td><td>1,480 bps (14.8%)</td><td>$500 USDC</td></tr>
+  </tbody>
+</table>
+
+<p>
+  The deposit flow mirrors AjoCircle: any input token is swapped to USDC via Uniswap V3.
+  On claim, USDC is optionally swapped to the user's preferred output token. The
+  <code>aTokenShares</code> field on the Vault struct is reserved for a future Aave V3
+  integration that will compound the principal on mainnet.
+</p>
+
+<!-- UsernameRegistry -->
+<div class="contract-block">
+  <div class="label">Contract 3 of 3</div>
+  <div class="name">UsernameRegistry.sol</div>
+  <div class="label">Sepolia address</div>
+  <div class="addr">0x2808324229e00C3Dc10BEe19fd8eb2Df24991eA5</div>
+</div>
+
+<h3>2.3 UsernameRegistry — On-Chain Identity</h3>
+<p>
+  A lightweight registry mapping wallet addresses to unique human-readable names.
+  No ENS dependency — the registry is self-contained.
+</p>
+<ul>
+  <li>1–32 characters: <code>a–z</code>, <code>A–Z</code>, <code>0–9</code>, <code>-</code>, <code>_</code></li>
+  <li>Case-insensitive uniqueness — stored and compared in lowercase</li>
+  <li>Free to claim — user pays gas only</li>
+  <li>One name per address; claiming a new one auto-releases the previous</li>
+  <li>24-hour cooldown between claims to prevent namespace cycling</li>
+</ul>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 3. MOBILE APPLICATION                                                   -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>3. Mobile Application</h2>
+<p>
+  The mobile app is an <strong>Expo (React Native)</strong> application targeting Android,
+  built with the Expo Dev Client (not Expo Go) due to the native Magic SDK modules.
+  It is distributed as an APK via Expo Application Services (EAS).
+</p>
+
+<h3>3.1 Authentication — Magic Link SDK</h3>
+<p>
+  Users authenticate with their <strong>email address</strong> via Magic's Email OTP flow.
+  Magic provisions a non-custodial embedded wallet behind the scenes — the user never
+  sees a seed phrase. The wallet is injected into wagmi via a custom <code>MagicConnector</code>.
+</p>
+
+<div class="flow">
+  <div class="flow-step">User enters email</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-step">Magic OTP WebView</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-step">magic.user.isLoggedIn()</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-step">eth_accounts → wallet address</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-step">wagmi connected</div>
+</div>
+
+<p>
+  A PIN system layered on top of Magic (stored in <code>expo-secure-store</code>) adds
+  a fast re-auth gate without requiring the user to re-enter their email every session.
+</p>
+
+<h3>3.2 Transaction Layer — sendTx Utility</h3>
+<p>
+  Rather than using wagmi's <code>writeContractAsync</code> (which has first-click failures
+  when Magic's WebView isn't fully warm), a custom <code>sendTx()</code> utility:
+</p>
+<ol>
+  <li>Fetches the wallet address directly via <code>magic.rpcProvider.request({ method: 'eth_accounts' })</code></li>
+  <li>Uses <strong>viem</strong>'s <code>encodeFunctionData</code> to ABI-encode the calldata</li>
+  <li>Estimates gas via the public Infura/Sepolia RPC, adds a 30% buffer</li>
+  <li>Signs and broadcasts via <code>eth_sendTransaction</code> through Magic's relay</li>
+  <li>Waits for receipt via viem's <code>publicClient.waitForTransactionReceipt()</code></li>
+</ol>
+<p>
+  All network calls are wrapped in <code>withTimeout()</code> to surface failures quickly
+  rather than hanging indefinitely.
+</p>
+
+<h3>3.3 On-Chain Data Reading — wagmi + viem</h3>
+<p>
+  Contract state is read using wagmi's <code>useReadContract</code> and <code>useReadContracts</code>
+  hooks (batch multicall). All reads poll every 30 seconds to stay in sync with chain state.
+</p>
+
+<table>
+  <thead><tr><th>Hook</th><th>Contract</th><th>What it reads</th></tr></thead>
+  <tbody>
+    <tr><td>useCircles()</td><td>AjoCircle</td><td>getUserCircles() → batched getCircleInfo() + getMembers() + getMemberPosition()</td></tr>
+    <tr><td>useVaults()</td><td>RollaVault</td><td>getUserVaults() → batched vaults() + getVaultBalance() + isMatured()</td></tr>
+    <tr><td>useVaultTiersFromChain()</td><td>RollaVault</td><td>minDeposits, lockDurations, aprBps for all 3 tiers</td></tr>
+    <tr><td>useUsername()</td><td>UsernameRegistry</td><td>nameOf(address)</td></tr>
+    <tr><td>useDisplayName()</td><td>UsernameRegistry</td><td>nameOf() with fallback to truncated address</td></tr>
+    <tr><td>useCircleCount()</td><td>AjoCircle</td><td>circleCount() — total circles created</td></tr>
+  </tbody>
+</table>
+
+<h3>3.4 Feature Screens and Components</h3>
+
+<table>
+  <thead><tr><th>Screen / Component</th><th>Contract interaction</th></tr></thead>
+  <tbody>
+    <tr><td>Home tab</td><td>Reads circle list, vault balances, payout alerts</td></tr>
+    <tr><td>CreateCircleWizard</td><td>Calls AjoCircle.createCircle() via useCreateCircle hook</td></tr>
+    <tr><td>JoinByIdModal</td><td>Calls AjoCircle.joinCircle() via useJoinCircle hook</td></tr>
+    <tr><td>CircleDetail / AjoPot</td><td>Calls AjoCircle.contribute() via useContribute hook (ERC-20 approve → contribute)</td></tr>
+    <tr><td>PayoutSheet</td><td>Calls AjoCircle.claimPayout() via useClaim hook</td></tr>
+    <tr><td>DepositModal</td><td>Calls RollaVault.deposit() via useDeposit hook</td></tr>
+    <tr><td>VaultCard</td><td>Calls RollaVault.claim() when vault is matured</td></tr>
+    <tr><td>ClaimNameButton</td><td>Calls UsernameRegistry.claim() via useClaimNameOnChain hook</td></tr>
+    <tr><td>SendSheet</td><td>Direct ERC-20 transfer via viem (peer-to-peer)</td></tr>
+    <tr><td>ProfileSidebar</td><td>Displays on-chain username and wallet address</td></tr>
+    <tr><td>TransactionItem</td><td>Displays tx hash with Sepolia Etherscan deep-link</td></tr>
+  </tbody>
+</table>
+
+<h3>3.5 Quote Engine</h3>
+<p>
+  The <code>useQuote()</code> hook queries the <strong>Uniswap V3 Quoter contract</strong>
+  (<code>0xEd1f6473…</code>) off-chain before any swap-based contribution or deposit to
+  preview the expected USDC output. This prevents users from accidentally falling below
+  the minimum contribution threshold.
+</p>
+
+<h3>3.6 Push Notifications</h3>
+<p>
+  <code>expo-notifications</code> and <code>expo-task-manager</code> with
+  <code>expo-background-fetch</code> are used to alert users when a circle payout is
+  pending, when a new round starts, or when a vault matures.
+</p>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 4. FRONTEND (MARKETING SITE)                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>4. Marketing Website (Next.js)</h2>
+<p>
+  A statically rendered Next.js 16 site (App Router) deployed to Vercel. It serves
+  as the product landing page and includes a live <code>ClaimUsername</code> widget
+  that connects to the UsernameRegistry contract via viem — the only on-chain
+  interaction on the web frontend.
+</p>
+<ul>
+  <li>App Router with server components by default</li>
+  <li>Tailwind CSS v4 for styling</li>
+  <li>No external auth — read-only contract calls and username registration only</li>
+  <li>GetApp modal deep-links to the Expo EAS APK build for Android download</li>
+</ul>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 5. FULL TECHNOLOGY STACK                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>5. Full Technology Stack & Packages</h2>
+
+<h3>5.1 Smart Contract Layer</h3>
+<table>
+  <thead><tr><th>Package / Tool</th><th>Version</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>Solidity</td><td>^0.8.20</td><td>Smart contract language</td></tr>
+    <tr><td>Hardhat</td><td>^2.28.6</td><td>Compile, test, and deploy contracts locally and to Sepolia</td></tr>
+    <tr><td>@nomicfoundation/hardhat-toolbox</td><td>^6.1.2</td><td>All-in-one Hardhat plugin: ethers, chai, coverage, gas reporter</td></tr>
+    <tr><td>@nomicfoundation/hardhat-ignition</td><td>^0.15.16</td><td>Declarative deployment modules for reproducible deploys</td></tr>
+    <tr><td>@nomicfoundation/hardhat-verify</td><td>^2.1.3</td><td>Etherscan contract verification after deploy</td></tr>
+    <tr><td>ethers.js</td><td>^6.17.0</td><td>Used in deploy scripts and Hardhat test helpers</td></tr>
+    <tr><td>typechain</td><td>^8.3.2</td><td>Generates TypeScript types from contract ABIs</td></tr>
+    <tr><td>hardhat-gas-reporter</td><td>^2.3.0</td><td>Per-function gas cost reporting in test output</td></tr>
+    <tr><td>solidity-coverage</td><td>^0.8.17</td><td>Code coverage for Solidity tests</td></tr>
+    <tr><td>chai</td><td>^4.5.0</td><td>Assertion library used in contract unit tests</td></tr>
+  </tbody>
+</table>
+
+<p><strong>External protocols integrated at the contract level (no npm package — called via interface):</strong></p>
+<ul>
+  <li><strong>Uniswap V3 SwapRouter</strong> (<code>0x3bFA4769…</code>) — atomic token swaps inside contribute / deposit / claim</li>
+  <li><strong>Uniswap V3 Quoter</strong> (<code>0xEd1f6473…</code>) — off-chain price preview before swaps</li>
+  <li><strong>WETH9</strong> (<code>0xfFf9976782…</code>) — wraps native ETH for Uniswap paths</li>
+  <li><strong>USDC (Circle)</strong> (<code>0x1c7D4B19…</code>) — stable denomination for all savings and payouts</li>
+  <li><strong>Aave V3 Pool</strong> (<code>0x6Ae43d32…</code>) — reserved for future yield integration on mainnet</li>
+  <li><strong>Chainlink ETH/USD feed</strong> (<code>0x694AA176…</code>) — reserved for future USD-denominated display</li>
+</ul>
+
+<h3>5.2 Mobile Application Layer</h3>
+<table>
+  <thead><tr><th>Package</th><th>Version</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>expo</td><td>~54.0.34</td><td>Core Expo framework — build tooling, OTA updates, native module wiring</td></tr>
+    <tr><td>expo-router</td><td>~6.0.23</td><td>File-system based navigation (tabs, stack, modals)</td></tr>
+    <tr><td>expo-dev-client</td><td>~6.0.21</td><td>Custom dev build required for native Magic SDK modules</td></tr>
+    <tr><td>react-native</td><td>0.81.5</td><td>Cross-platform mobile UI runtime</td></tr>
+    <tr><td>react</td><td>19.1.0</td><td>UI component model</td></tr>
+    <tr><td>@magic-sdk/react-native-expo</td><td>^34.6.1</td><td>Email OTP auth + embedded wallet provisioning (no seed phrase UX)</td></tr>
+    <tr><td>wagmi</td><td>^2.19.5</td><td>React hooks for Ethereum: useAccount, useReadContract, useConnect</td></tr>
+    <tr><td>viem</td><td>^2.52.2</td><td>Low-level EVM type-safe client — ABI encoding, gas estimation, tx receipt polling</td></tr>
+    <tr><td>@tanstack/react-query</td><td>^5.101.0</td><td>Async data fetching and caching layer used by wagmi internally</td></tr>
+    <tr><td>nativewind</td><td>^4.2.5</td><td>Tailwind CSS utility classes in React Native (StyleSheet-based)</td></tr>
+    <tr><td>tailwindcss</td><td>^3.4.19</td><td>Tailwind source for NativeWind config</td></tr>
+    <tr><td>expo-secure-store</td><td>~15.0.8</td><td>Secure encrypted storage for PIN hash (iOS Keychain / Android Keystore)</td></tr>
+    <tr><td>expo-local-authentication</td><td>~17.0.8</td><td>Biometric / Face ID fallback for PIN auth</td></tr>
+    <tr><td>expo-notifications</td><td>~0.32.17</td><td>Push notifications for payout alerts and round reminders</td></tr>
+    <tr><td>expo-background-fetch</td><td>~14.0.9</td><td>Background polling for vault maturity and payout events</td></tr>
+    <tr><td>expo-task-manager</td><td>~14.0.9</td><td>Registers background tasks for notifications</td></tr>
+    <tr><td>expo-font</td><td>~14.0.11</td><td>Custom font loading (Inter family)</td></tr>
+    <tr><td>expo-linear-gradient</td><td>~15.0.8</td><td>Gradient backgrounds in onboarding and header</td></tr>
+    <tr><td>expo-splash-screen</td><td>~31.0.13</td><td>Controls splash screen visibility during app init</td></tr>
+    <tr><td>expo-linking</td><td>~8.0.12</td><td>Deep-link handling for circle invite URLs</td></tr>
+    <tr><td>expo-crypto</td><td>~15.0.9</td><td>Cryptographic utilities (used in PIN hashing)</td></tr>
+    <tr><td>expo-web-browser</td><td>~15.0.11</td><td>Opens Etherscan links and external URLs in-app</td></tr>
+    <tr><td>@react-native-async-storage/async-storage</td><td>2.2.0</td><td>Persistent key-value store (non-sensitive app state)</td></tr>
+    <tr><td>@react-native-community/netinfo</td><td>11.4.1</td><td>Network connectivity detection</td></tr>
+    <tr><td>react-native-reanimated</td><td>~4.1.1</td><td>High-performance animations (bottom sheets, transitions)</td></tr>
+    <tr><td>react-native-safe-area-context</td><td>~5.6.0</td><td>Safe area insets for notch / Dynamic Island aware layouts</td></tr>
+    <tr><td>react-native-screens</td><td>~4.16.0</td><td>Native navigation stack optimization</td></tr>
+    <tr><td>react-native-modal</td><td>^14.0.0-rc.1</td><td>Animated modal overlay for sheets and dialogs</td></tr>
+    <tr><td>react-native-svg</td><td>15.12.1</td><td>SVG rendering for icons and charts</td></tr>
+    <tr><td>react-native-webview</td><td>^13.15.0</td><td>Hosts Magic SDK's embedded browser for OTP flow</td></tr>
+    <tr><td>react-native-get-random-values</td><td>~1.11.0</td><td>Polyfill for crypto.getRandomValues (required by viem)</td></tr>
+    <tr><td>@ethersproject/shims</td><td>^5.8.0</td><td>React Native shims for ethers.js BigNumber compatibility</td></tr>
+    <tr><td>fast-text-encoding</td><td>^1.0.6</td><td>TextEncoder/TextDecoder polyfill for React Native</td></tr>
+    <tr><td>react-native-worklets</td><td>0.5.1</td><td>JS worklet engine for Reanimated 4</td></tr>
+    <tr><td>@expo/vector-icons</td><td>^15.0.3</td><td>Icon set (Ionicons used throughout the app)</td></tr>
+    <tr><td>expo-application</td><td>~7.0.8</td><td>App version info for settings screen</td></tr>
+    <tr><td>expo-auth-session</td><td>~7.0.11</td><td>OAuth session utilities (reserved)</td></tr>
+  </tbody>
+</table>
+
+<h3>5.3 Marketing Website Layer</h3>
+<table>
+  <thead><tr><th>Package</th><th>Version</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>next</td><td>16.2.9</td><td>React framework — App Router, server components, static generation</td></tr>
+    <tr><td>react / react-dom</td><td>19.2.4</td><td>UI rendering</td></tr>
+    <tr><td>viem</td><td>^2.53.1</td><td>On-chain reads and UsernameRegistry.claim() writes</td></tr>
+    <tr><td>tailwindcss</td><td>^4</td><td>Utility CSS — landing page styling</td></tr>
+    <tr><td>@tailwindcss/postcss</td><td>^4</td><td>PostCSS plugin for Tailwind v4</td></tr>
+    <tr><td>typescript</td><td>^5</td><td>Static typing across all source files</td></tr>
+    <tr><td>eslint / eslint-config-next</td><td>^9 / 16.2.9</td><td>Linting with Next.js recommended rules</td></tr>
+  </tbody>
+</table>
+
+<h3>5.4 Infrastructure &amp; Tooling</h3>
+<table>
+  <thead><tr><th>Tool / Service</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>Expo Application Services (EAS)</td><td>Cloud Android APK builds, OTA update delivery</td></tr>
+    <tr><td>Vercel</td><td>Next.js hosting — zero-config deploys, preview URLs</td></tr>
+    <tr><td>Infura (Sepolia RPC)</td><td>JSON-RPC endpoint for gas estimation and tx broadcast</td></tr>
+    <tr><td>Magic.link relay</td><td>Signs transactions on behalf of the user's embedded wallet</td></tr>
+    <tr><td>Sepolia Etherscan</td><td>Block explorer — contract verification, tx deep-links</td></tr>
+    <tr><td>Hardhat Ignition</td><td>Reproducible deployment modules with state tracking</td></tr>
+    <tr><td>pnpm</td><td>Package manager used in the frontend monorepo</td></tr>
+    <tr><td>Metro bundler</td><td>React Native JavaScript bundler (via Expo)</td></tr>
+  </tbody>
+</table>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 6. WHY ON-CHAIN                                                         -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>6. Why Rolla Must Be On-Chain</h2>
+
+<p>
+  The ajo/esusu savings model is built entirely on trust between participants.
+  Traditional circles fail for one reason: <em>the organizer holds the money</em>.
+  They can disappear, delay payouts, or simply be unreachable. Moving to a
+  centralized app solves the disappearance problem but replaces the organizer
+  risk with company risk — the platform can freeze accounts, go bankrupt, or
+  geofence users. On-chain execution eliminates both risks at the source.
+</p>
+
+<div class="why-grid">
+  <div class="why-item">
+    <div class="why-num">01</div>
+    <h4>No Custodial Risk</h4>
+    <p>
+      Funds are held in the smart contract, not in a company bank account. Rolla
+      the company cannot move, freeze, or seize funds. The <code>rescueETH()</code>
+      admin function only recovers accidentally-sent ETH — it cannot touch USDC
+      inside any circle or vault.
+    </p>
+  </div>
+
+  <div class="why-item">
+    <div class="why-num">02</div>
+    <h4>Trustless Payout Order</h4>
+    <p>
+      Payout positions are set permanently when members join and recorded on-chain.
+      No organizer can skip someone, change the order, or grant themselves an extra
+      round. The contract enforces rotation deterministically.
+    </p>
+  </div>
+
+  <div class="why-item">
+    <div class="why-num">03</div>
+    <h4>Permissionless & Global</h4>
+    <p>
+      Anyone with a wallet can create or join a circle — no KYC, no bank account,
+      no geographic restriction. This is critical for diaspora communities sending
+      value back home and for users in countries with limited banking infrastructure.
+    </p>
+  </div>
+
+  <div class="why-item">
+    <div class="why-num">04</div>
+    <h4>Transparent Accounting</h4>
+    <p>
+      Every contribution, payout, and membership change is a public transaction on
+      Sepolia. Any member can independently verify the pool balance and round status
+      without trusting a dashboard — they can query the contract directly.
+    </p>
+  </div>
+
+  <div class="why-item">
+    <div class="why-num">05</div>
+    <h4>Atomic Multi-Token Swaps</h4>
+    <p>
+      Because Uniswap V3 is also on-chain, contributions and payouts can accept any
+      EVM token in the same atomic transaction. This is impossible to replicate
+      safely with off-chain systems without introducing counterparty risk at the
+      swap layer.
+    </p>
+  </div>
+
+  <div class="why-item">
+    <div class="why-num">06</div>
+    <h4>Composable with DeFi</h4>
+    <p>
+      Circle pools and vault deposits can be routed into Aave V3 in a future upgrade
+      to earn yield while idle. This composability — using one protocol's liquidity
+      inside another — is unique to on-chain finance and impossible with closed
+      banking APIs.
+    </p>
+  </div>
+
+  <div class="why-item">
+    <div class="why-num">07</div>
+    <h4>Censorship Resistance</h4>
+    <p>
+      Once deployed, the contracts run forever on Ethereum's validator network.
+      No government, bank, or company can shut down the core savings logic. Even
+      if the Rolla app disappears, members can interact with the contracts directly
+      via Etherscan or any EVM wallet.
+    </p>
+  </div>
+
+  <div class="why-item">
+    <div class="why-num">08</div>
+    <h4>On-Chain Identity</h4>
+    <p>
+      Usernames registered in <code>UsernameRegistry</code> follow the wallet —
+      not the app. If a user switches to a different Rolla client in the future,
+      their identity, history, and circle memberships are all intact on-chain.
+    </p>
+  </div>
+</div>
+
+<div class="card card-gold" style="margin-top: 24px;">
+  <h4 style="color: var(--gold); text-transform: none; font-size: 11.5pt; margin-bottom: 6px;">Summary</h4>
+  <p>
+    A centralised savings app can automate the ledger. Only an on-chain app can
+    eliminate the need to trust the ledger keeper. Rolla's value proposition —
+    saving in a circle with people you may only partially trust, across borders,
+    without a common bank — only works if the custody, the order, and the
+    accounting are enforced by math, not by humans.
+  </p>
+</div>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 7. ARCHITECTURE DIAGRAM                                                 -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>7. System Architecture Overview</h2>
+
+<table>
+  <thead><tr><th>Layer</th><th>Component</th><th>Technology</th><th>Connects to</th></tr></thead>
+  <tbody>
+    <tr><td>Blockchain</td><td>AjoCircle</td><td>Solidity / Sepolia</td><td>Uniswap V3, USDC, WETH</td></tr>
+    <tr><td>Blockchain</td><td>RollaVault</td><td>Solidity / Sepolia</td><td>Uniswap V3, USDC, WETH, Aave V3 (future)</td></tr>
+    <tr><td>Blockchain</td><td>UsernameRegistry</td><td>Solidity / Sepolia</td><td>Independent</td></tr>
+    <tr><td>Mobile</td><td>WalletContext</td><td>React / wagmi / Magic SDK</td><td>Magic relay, wagmi, Infura RPC</td></tr>
+    <tr><td>Mobile</td><td>sendTx()</td><td>viem + Magic rpcProvider</td><td>Infura (gas), Magic (signing)</td></tr>
+    <tr><td>Mobile</td><td>useCircles / useVaults</td><td>wagmi useReadContracts</td><td>AjoCircle, RollaVault on Sepolia</td></tr>
+    <tr><td>Mobile</td><td>useQuote()</td><td>viem public client</td><td>Uniswap V3 Quoter on Sepolia</td></tr>
+    <tr><td>Web</td><td>ClaimUsername</td><td>viem + Next.js</td><td>UsernameRegistry on Sepolia</td></tr>
+    <tr><td>Web</td><td>GetAppModal</td><td>Next.js static</td><td>Expo EAS build (APK link)</td></tr>
+    <tr><td>Infra</td><td>EAS Build</td><td>Expo cloud builder</td><td>Android APK → user device</td></tr>
+    <tr><td>Infra</td><td>Vercel</td><td>Next.js hosting</td><td>Static edge delivery</td></tr>
+  </tbody>
+</table>
+
+<hr />
+
+<p style="font-size: 9.5pt; color: #999; text-align: center; margin-top: 32px; font-family: sans-serif;">
+  Rolla Technical Overview · June 2026 · Gbadamosi Bashir Olamide ·
+  Contracts verified on Sepolia Etherscan
+</p>
+
+</body>
+</html>
