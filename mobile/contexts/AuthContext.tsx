@@ -18,6 +18,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isSetup: boolean;
   hasBiometrics: boolean;
+  isInitialized: boolean;
   authVisible: boolean;
   authMode: AuthMode;
   /** Call before any sensitive operation. Resolves true on success, false on cancel. */
@@ -34,6 +35,8 @@ interface AuthContextValue {
   verifyBiometric: () => Promise<boolean>;
   /** Lock the session (e.g. user logs out of wallet). */
   lock: () => void;
+  /** Clear PIN on logout — called when user disconnects wallet. */
+  clearPin: () => Promise<void>;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -49,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [authVisible, setAuthVisible] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('unlock');
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const sessionAt = useRef<number>(0);
   // Queue of pending Promise resolvers waiting for auth
@@ -58,12 +62,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const stored = await SecureStore.getItemAsync(PIN_HASH_KEY);
-      setIsSetup(!!stored);
+      console.log('🔄 AuthProvider initializing...');
+      try {
+        const stored = await SecureStore.getItemAsync(PIN_HASH_KEY);
+        const hasPIN = !!stored;
+        console.log(`🔐 SecureStore PIN check: ${hasPIN ? '✅ PIN found' : '❌ No PIN stored'}`);
+        setIsSetup(hasPIN);
+        if (!hasPIN) {
+          console.log('⚠️ User will need to set up PIN on next auth gate');
+        }
+      } catch (e: any) {
+        console.error('❌ SecureStore read failed:', e?.message || e);
+        setIsSetup(false);
+      }
 
-      const compatible = await LocalAuth.hasHardwareAsync();
-      const enrolled   = await LocalAuth.isEnrolledAsync();
-      setHasBiometrics(compatible && enrolled);
+      try {
+        const compatible = await LocalAuth.hasHardwareAsync();
+        const enrolled   = await LocalAuth.isEnrolledAsync();
+        const bioAvailable = compatible && enrolled;
+        console.log(`👆 Biometric available: ${bioAvailable}`);
+        setHasBiometrics(bioAvailable);
+      } catch (e: any) {
+        console.error('❌ Biometric check failed:', e?.message || e);
+        setHasBiometrics(false);
+      }
+
+      // Mark as initialized only after all checks complete
+      console.log('✅ AuthProvider initialized');
+      setIsInitialized(true);
     })();
   }, []);
 
@@ -85,9 +111,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, pin);
 
   const setupPin = useCallback(async (pin: string) => {
-    const hash = await hashPin(pin);
-    await SecureStore.setItemAsync(PIN_HASH_KEY, hash);
-    setIsSetup(true);
+    try {
+      const hash = await hashPin(pin);
+      console.log('💾 Saving PIN hash to SecureStore...');
+      await SecureStore.setItemAsync(PIN_HASH_KEY, hash);
+      console.log('✅ PIN saved successfully');
+      setIsSetup(true);
+    } catch (e) {
+      console.error('❌ Failed to save PIN:', e);
+      throw e;
+    }
   }, []);
 
   const verifyPin = useCallback(async (pin: string) => {
@@ -150,24 +183,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionAt.current = 0;
   }, []);
 
+  const clearPin = useCallback(async () => {
+    try {
+      await SecureStore.deleteItemAsync(PIN_HASH_KEY);
+    } catch (e) {
+      if (__DEV__) console.warn('Failed to delete PIN:', e);
+    }
+    // Clear state regardless of deletion success
+    setIsSetup(false);
+    setIsAuthenticated(false);
+    sessionAt.current = 0;
+    setAuthVisible(false);
+    pendingRef.current = [];
+  }, []);
+
   // ── App-open auth gate ───────────────────────────────────────────────────────
-  // Show whenever PIN is set AND user is not authenticated.
-  // Fires on mount (initial check) and whenever isAuthenticated flips to false
-  // (e.g. app comes back from background via the AppState handler above).
+  // Only fires AFTER isInitialized — ensures SecureStore check completed first.
+  // Without this guard, isSetup is still false during initialization and the
+  // gate would show SetupScreen even when a PIN already exists in storage.
   useEffect(() => {
-    if (isSetup && !isAuthenticated && !authVisible) {
+    if (!isInitialized) return;
+
+    if (isSetup && !isAuthenticated) {
       setAuthMode('unlock');
       setAuthVisible(true);
     }
-  }, [isSetup, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isSetup) {
+      setAuthVisible(false);
+      pendingRef.current = [];
+    }
+  }, [isSetup, isAuthenticated, isInitialized]);
 
   return (
     <AuthContext.Provider value={{
-      isAuthenticated, isSetup, hasBiometrics,
+      isAuthenticated, isSetup, hasBiometrics, isInitialized,
       authVisible, authMode,
       requireAuth, setupPin,
       onAuthSuccess, onAuthCancel,
-      verifyPin, verifyBiometric, lock,
+      verifyPin, verifyBiometric, lock, clearPin,
     }}>
       {children}
     </AuthContext.Provider>

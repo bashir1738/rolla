@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, Share, RefreshControl,
@@ -8,9 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useBalance } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { formatUnits } from 'viem';
+import { useQueryClient } from '@tanstack/react-query';
 import { TransactionItem, type TxType } from '../../components/TransactionItem';
 import { useWallet } from '../../providers/WalletContext';
-import { fmtAddr } from '../../hooks/useDisplayName';
+function fmtAddr(addr: string) { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 import { ProfileButton } from '../../components/ProfileSidebar';
 import { useProfileSidebar } from '../../contexts/ProfileSidebarContext';
 import { TOKEN_ADDRESSES } from '../../constants/addresses';
@@ -65,13 +66,23 @@ const TOKENS: TokenDef[] = [
 // ── TokenRow ─────────────────────────────────────────────────────────────────
 
 function TokenRow({
-  token, walletAddress, isLast,
-}: { token: TokenDef; walletAddress: `0x${string}`; isLast: boolean }) {
+  token, walletAddress, isLast, refreshing,
+}: { token: TokenDef; walletAddress: `0x${string}`; isLast: boolean; refreshing: boolean }) {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useBalance({
     address: walletAddress,
     token: token.tokenAddress,
     chainId: sepolia.id,
   });
+
+  // Refetch balance when refreshing signal changes
+  useEffect(() => {
+    if (refreshing) {
+      queryClient.invalidateQueries({
+        queryKey: ['balance', { address: walletAddress, token: token.tokenAddress, chainId: sepolia.id }]
+      });
+    }
+  }, [refreshing, walletAddress, token.tokenAddress, queryClient]);
 
   const formatted = data
     ? parseFloat(formatUnits(data.value, data.decimals)).toLocaleString('en-US', {
@@ -118,11 +129,12 @@ function TokenRow({
 // ── Assets section (ListHeader) ───────────────────────────────────────────────
 
 function AssetsHeader({
-  walletAddress, active, setActive,
+  walletAddress, active, setActive, refreshing,
 }: {
   walletAddress: `0x${string}`;
   active: Filter;
   setActive: (f: Filter) => void;
+  refreshing: boolean;
 }) {
   return (
     <>
@@ -140,6 +152,7 @@ function AssetsHeader({
             token={t}
             walletAddress={walletAddress}
             isLast={i === TOKENS.length - 1}
+            refreshing={refreshing}
           />
         ))}
       </View>
@@ -286,6 +299,7 @@ export default function WalletTab() {
                 walletAddress={address!}
                 active={active}
                 setActive={setActive}
+                refreshing={refreshing}
               />
             }
             contentContainerStyle={filtered.length === 0 ? { flex: 1 } : { paddingBottom: 32 }}

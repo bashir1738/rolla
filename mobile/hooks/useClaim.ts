@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react';
-import { useWriteContract } from 'wagmi';
 import type { TxState } from '../providers/WalletContext';
-import { CONTRACT_ADDRESSES, TOKEN_ADDRESSES } from '../constants/addresses';
+import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { AJO_CIRCLE_ABI, ROLLA_VAULT_ABI } from '../constants/abis';
-import { useAuth } from '../contexts/AuthContext';
+import { sendTx } from '../lib/sendTx';
 
 type ClaimParams =
   | { type: 'circle'; circleId: number; tokenOut: `0x${string}`; amountOutMinimum: bigint; poolFee: number }
@@ -14,13 +13,7 @@ export function useClaim() {
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { requireAuth } = useAuth();
-  const { writeContractAsync } = useWriteContract();
-
   const claim = useCallback(async (params: ClaimParams) => {
-    const authed = await requireAuth();
-    if (!authed) return;
-
     setTxState('signing');
     setError(null);
     setTxHash(null);
@@ -29,14 +22,14 @@ export function useClaim() {
       let hash: `0x${string}`;
 
       if (params.type === 'circle') {
-        hash = await writeContractAsync({
+        hash = await sendTx({
           address: CONTRACT_ADDRESSES.AJO_CIRCLE,
           abi: AJO_CIRCLE_ABI,
           functionName: 'claimPayout',
           args: [BigInt(params.circleId), params.tokenOut, params.amountOutMinimum, params.poolFee],
         });
       } else {
-        hash = await writeContractAsync({
+        hash = await sendTx({
           address: CONTRACT_ADDRESSES.ROLLA_VAULT,
           abi: ROLLA_VAULT_ABI,
           functionName: 'claim',
@@ -50,7 +43,7 @@ export function useClaim() {
       setError(e?.shortMessage ?? e?.message ?? 'Transaction failed');
       setTxState('error');
     }
-  }, [writeContractAsync, requireAuth]);
+  }, []);
 
   const reset = useCallback(() => { setTxState('idle'); setError(null); setTxHash(null); }, []);
 

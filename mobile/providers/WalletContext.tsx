@@ -15,11 +15,14 @@ async function getMagicAddress(retries = 3): Promise<`0x${string}` | null> {
   const provider = magic.rpcProvider as unknown as { request: (args: { method: string }) => Promise<string[]> };
   for (let i = 0; i < retries; i++) {
     try {
-      const accounts = await provider.request({ method: 'eth_accounts' });
+      // 5s timeout per attempt — prevents hanging if Magic relay is unresponsive
+      const accounts = await Promise.race([
+        provider.request({ method: 'eth_accounts' }),
+        new Promise<string[]>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5_000)),
+      ]);
       const addr = accounts?.[0];
       if (addr) return getAddress(addr) as `0x${string}`;
     } catch {}
-    // Brief wait before retry — new accounts may take a moment to provision
     if (i < retries - 1) await new Promise((r) => setTimeout(r, 800));
   }
   return null;
@@ -136,9 +139,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [wireWagmi]);
 
   const disconnect = useCallback(async () => {
-    // Clear state immediately so the UI updates on first tap, not second.
     setIsAuthenticated(false);
     setMagicAddress(undefined);
+
+    // Disconnect from wagmi and Magic
     try { await disconnectAsync(); } catch {}
     try { await magic.user.logout(); } catch {}
   }, [disconnectAsync]);

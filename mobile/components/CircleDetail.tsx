@@ -9,29 +9,27 @@ import { useContribute } from '../hooks/useContribute';
 import { useClaim } from '../hooks/useClaim';
 import { useWallet } from '../providers/WalletContext';
 import { TOKEN_ADDRESSES, CONTRACT_ADDRESSES } from '../constants/addresses';
-import { USERNAME_REGISTRY_ABI } from '../constants/abis';
-import { fmtAddr } from '../hooks/useDisplayName';
+import { AJO_CIRCLE_ABI } from '../constants/abis';
 import type { CircleData } from '../hooks/useCircles';
 
+function fmtAddr(addr: string) { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 function fmtUSDC(n: bigint) {
   return (Number(n) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 0 });
 }
 
-function MemberRow({ addr, position, isNext, isMe }: {
+function MemberRow({ addr, position, isNext, isMe, circleId }: {
   addr: string; position: number; isNext: boolean; isMe: boolean;
+  circleId: number; currentRound: number;
 }) {
-  const { data: raw } = useReadContract({
-    address: CONTRACT_ADDRESSES.USERNAME_REGISTRY,
-    abi: USERNAME_REGISTRY_ABI,
-    functionName: 'nameOf',
-    args: [addr as `0x${string}`],
+  const { data: hasPaidData } = useReadContract({
+    address: CONTRACT_ADDRESSES.AJO_CIRCLE,
+    abi: AJO_CIRCLE_ABI,
+    functionName: 'hasPaid',
+    args: [BigInt(circleId), addr as `0x${string}`],
   });
 
-  const registryName = typeof raw === 'string' && raw.length > 0 ? raw : null;
-  const primaryLabel = isMe
-    ? (registryName ? `${registryName} (You)` : 'You')
-    : (registryName ?? fmtAddr(addr));
-  const subLabel = registryName ? fmtAddr(addr) : null;
+  const label = isMe ? `${fmtAddr(addr)} (You)` : fmtAddr(addr);
+  const hasPaid = hasPaidData === true;
 
   return (
     <View className="flex-row items-center gap-3 py-2.5 border-b border-border">
@@ -40,22 +38,26 @@ function MemberRow({ addr, position, isNext, isMe }: {
       </View>
       <View className="flex-1">
         <Text
-          className="text-sm font-semibold"
+          className="text-sm font-semibold font-mono"
           style={{ color: isMe ? '#1A3C2B' : '#1C1C1E' }}
           numberOfLines={1}
         >
-          {primaryLabel}
+          {label}
         </Text>
-        {subLabel && (
-          <Text className="text-muted text-xs font-mono mt-0.5" numberOfLines={1}>{subLabel}</Text>
+      </View>
+      <View className="flex-row items-center gap-2">
+        {hasPaid && (
+          <View className="bg-green-100 rounded-lg px-2 py-1">
+            <Ionicons name="checkmark" size={14} color="#16A34A" />
+          </View>
+        )}
+        {isNext && (
+          <View className="flex-row items-center gap-1 bg-accent px-2 py-0.5 rounded-lg">
+            <Ionicons name="star" size={10} color="#1A3C2B" />
+            <Text className="text-primary text-[11px] font-bold">Next</Text>
+          </View>
         )}
       </View>
-      {isNext && (
-        <View className="flex-row items-center gap-1 bg-accent px-2 py-0.5 rounded-lg">
-          <Ionicons name="star" size={10} color="#1A3C2B" />
-          <Text className="text-primary text-[11px] font-bold">Next</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -83,7 +85,6 @@ export function CircleDetail({ circle, visible, onClose }: {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View className="items-center px-6 pb-5">
-            <Text style={{ fontSize: 40 }} className="mb-2">{circle.emoji}</Text>
             <Text className="text-charcoal text-xl font-black text-center">{circle.name}</Text>
             <Text className="text-muted text-sm mt-1">
               {circle.members.length} members · Round {circle.currentRound}/{circle.totalRounds}
@@ -125,6 +126,8 @@ export function CircleDetail({ circle, visible, onClose }: {
                 position={i + 1}
                 isNext={i + 1 === circle.currentRound && circle.payoutPending}
                 isMe={m.toLowerCase() === address?.toLowerCase()}
+                circleId={circle.id}
+                currentRound={circle.currentRound}
               />
             ))}
           </View>

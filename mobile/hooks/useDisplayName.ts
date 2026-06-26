@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useReadContract } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import { CONTRACT_ADDRESSES } from '../constants/addresses';
 import { USERNAME_REGISTRY_ABI } from '../constants/abis';
 
@@ -12,11 +13,12 @@ export function fmtAddr(addr: string) {
 
 /** Resolves a display name for any address — on-chain registry first, then local. */
 export function useDisplayName(address?: `0x${string}`) {
+  const queryClient = useQueryClient();
   const [localName, setLocalName] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   // 1. On-chain read (works for ANY address, visible to everyone)
-  const { data: onChainRaw } = useReadContract({
+  const { data: onChainRaw, refetch: refetchOnChain } = useReadContract({
     address: CONTRACT_ADDRESSES.USERNAME_REGISTRY,
     abi: USERNAME_REGISTRY_ABI,
     functionName: 'nameOf',
@@ -46,23 +48,29 @@ export function useDisplayName(address?: `0x${string}`) {
 
   useEffect(() => { readLocal(); }, [readLocal]);
 
-  const save = useCallback(async (newName: string, signature?: string) => {
+  // Called AFTER a successful on-chain claim — persist locally and force UI refresh
+  const saveLocal = useCallback(async (newName: string) => {
     if (!address) return;
-    const trimmed = newName.trim();
-    const payload = JSON.stringify({ name: trimmed, sig: signature ?? null });
-    await AsyncStorage.setItem(localKey(address), payload);
+    const trimmed = newName.trim().toLowerCase();
+    await AsyncStorage.setItem(localKey(address), JSON.stringify({ name: trimmed }));
     setLocalName(trimmed);
-  }, [address]);
+    // Invalidate all nameOf reads so every component picks up the new name instantly
+    queryClient.invalidateQueries({ queryKey: ['readContract'] });
+    refetchOnChain();
+  }, [address, queryClient, refetchOnChain]);
 
-  const clear = useCallback(async () => {
+  // Called after a successful on-chain release()
+  const clearLocal = useCallback(async () => {
     if (!address) return;
     await AsyncStorage.removeItem(localKey(address));
     setLocalName(null);
-  }, [address]);
+    queryClient.invalidateQueries({ queryKey: ['readContract'] });
+    refetchOnChain();
+  }, [address, queryClient, refetchOnChain]);
 
   // on-chain name wins over local name
   const name = onChainName ?? localName;
   const display = name ?? (address ? fmtAddr(address) : null);
 
-  return { display, name, onChainName, localName, loaded, save, clear, refetch: readLocal };
+  return { display, name, onChainName, localName, loaded, saveLocal, clearLocal, refetch: readLocal };
 }

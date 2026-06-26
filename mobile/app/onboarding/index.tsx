@@ -60,7 +60,7 @@ export default function Onboarding() {
   const OVERLAP   = 32;
 
   React.useEffect(() => {
-    if (isConnected) router.replace('/onboarding/name');
+    if (isConnected) router.replace('/(tabs)');
   }, [isConnected]);
 
   const isLast = index === SLIDES.length - 1;

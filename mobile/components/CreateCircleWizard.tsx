@@ -5,6 +5,7 @@ import { TxStateView } from './TxStateView';
 import type { TxState } from '../providers/WalletContext';
 
 const FREQUENCIES = [
+  { label: '10 minutes', value: 10 * 60    },
   { label: 'Weekly',     value: 7 * 86400  },
   { label: 'Bi-weekly', value: 14 * 86400 },
   { label: 'Monthly',   value: 30 * 86400 },
@@ -29,12 +30,12 @@ export function CreateCircleWizard({ visible, onClose, txState, txHash, txError,
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [freqIdx, setFreqIdx] = useState(0);
-  const [members, setMembers] = useState(4);
+  const [members] = useState(2);
   const [creating, setCreating] = useState(false);
 
   const reset = () => {
     setStep(0); setName(''); setAmount('');
-    setFreqIdx(0); setMembers(4); setCreating(false);
+    setFreqIdx(0); setCreating(false);
   };
   const close = () => { reset(); onClose(); };
 
@@ -172,24 +173,15 @@ export function CreateCircleWizard({ visible, onClose, txState, txHash, txError,
               {/* Step 3 — Members & summary */}
               {step === 2 && (
                 <View className="gap-5">
-                  <Text className="text-charcoal text-xl font-black">How many members?</Text>
+                  <Text className="text-charcoal text-xl font-black">Circle size</Text>
 
-                  <View className="flex-row items-center justify-center gap-6 py-4">
-                    <TouchableOpacity
-                      className="w-12 h-12 rounded-full bg-primary items-center justify-center"
-                      onPress={() => setMembers((m) => Math.max(2, m - 1))}
-                    >
-                      <Ionicons name="remove" size={22} color="white" />
-                    </TouchableOpacity>
-                    <Text className="text-charcoal text-4xl font-black w-16 text-center">
-                      {members}
+                  <View className="bg-primary/5 border border-primary/15 rounded-2xl p-4">
+                    <Text className="text-charcoal text-3xl font-black text-center mb-2">
+                      2 Members
                     </Text>
-                    <TouchableOpacity
-                      className="w-12 h-12 rounded-full bg-primary items-center justify-center"
-                      onPress={() => setMembers((m) => Math.min(50, m + 1))}
-                    >
-                      <Ionicons name="add" size={22} color="white" />
-                    </TouchableOpacity>
+                    <Text className="text-muted text-sm text-center">
+                      Circles are limited to 2 members for tighter group dynamics.
+                    </Text>
                   </View>
 
                   <View className="bg-card border border-border rounded-2xl p-4 gap-1">

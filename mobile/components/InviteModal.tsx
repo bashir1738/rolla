@@ -6,10 +6,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { isAddress } from 'viem';
-import { useReadContract } from 'wagmi';
-import { CONTRACT_ADDRESSES } from '../constants/addresses';
-import { USERNAME_REGISTRY_ABI } from '../constants/abis';
-import { fmtAddr } from '../hooks/useDisplayName';
+function fmtAddr(addr: string) { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 import type { CircleData } from '../hooks/useCircles';
 
 function storageKey(circleId: number) {
@@ -30,26 +27,15 @@ async function saveInvites(circleId: number, list: string[]) {
 }
 
 function InvitedRow({ addr, onRemove }: { addr: string; onRemove: () => void }) {
-  const { data: raw } = useReadContract({
-    address: CONTRACT_ADDRESSES.USERNAME_REGISTRY,
-    abi: USERNAME_REGISTRY_ABI,
-    functionName: 'nameOf',
-    args: [addr as `0x${string}`],
-  });
-  const name = typeof raw === 'string' && raw.length > 0 ? raw : null;
-
   return (
     <View className="flex-row items-center gap-3 py-2.5 border-b border-border">
       <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
         <Ionicons name="person-outline" size={15} color="#1A3C2B" />
       </View>
       <View className="flex-1">
-        <Text className="text-charcoal text-sm font-semibold" numberOfLines={1}>
-          {name ?? fmtAddr(addr)}
+        <Text className="text-charcoal text-sm font-semibold font-mono" numberOfLines={1}>
+          {fmtAddr(addr)}
         </Text>
-        {name && (
-          <Text className="text-muted text-xs font-mono" numberOfLines={1}>{fmtAddr(addr)}</Text>
-        )}
       </View>
       <View className="flex-row items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
         <View className="w-1.5 h-1.5 rounded-full bg-amber-400" />

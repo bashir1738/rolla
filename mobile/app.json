@@ -22,7 +22,6 @@
           "fetch",
           "remote-notification"
         ],
-        "NSFaceIDUsageDescription": "Use Face ID to securely access your Rolla account",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -39,9 +38,7 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.WAKE_LOCK",
-        "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
@@ -60,9 +57,7 @@
         }
       ],
       "expo-background-fetch",
-      "expo-task-manager",
-      "expo-secure-store",
-      "expo-local-authentication"
+      "expo-task-manager"
     ],
     "experiments": {
       "typedRoutes": false

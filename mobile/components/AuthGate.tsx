@@ -213,9 +213,23 @@ function UnlockScreen({ onSuccess, onCancel, isTransaction }: {
 
 // ── AuthGate ──────────────────────────────────────────────────────────────────
 
-export function AuthGate() {
-  const { isSetup, authVisible, authMode, onAuthSuccess, onAuthCancel } = useAuth();
+import { useWallet } from '../providers/WalletContext';
 
+export function AuthGate() {
+  const {
+    isSetup, authVisible, authMode,
+    onAuthSuccess, onAuthCancel, isInitialized,
+  } = useAuth();
+  const { isConnected, isReady } = useWallet();
+
+  // Wait until both the wallet session and SecureStore check are done.
+  // isReady = Magic session check complete; isInitialized = SecureStore check complete.
+  if (!isReady || !isInitialized) return null;
+
+  // Don't show the gate if the user is logged out of their wallet.
+  if (!isConnected) return null;
+
+  // Don't show if no auth is currently needed.
   if (!authVisible) return null;
 
   const isTransaction = authMode === 'transaction';

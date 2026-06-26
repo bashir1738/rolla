@@ -1,19 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, Switch, Alert,
-  TextInput, ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useSignMessage } from 'wagmi';
-import { useFocusEffect } from 'expo-router';
 import { useWallet } from '../../providers/WalletContext';
-import { useDisplayName, fmtAddr } from '../../hooks/useDisplayName';
-import { usePin } from '../../hooks/usePin';
-import { ChangePinModal } from '../../components/ChangePinModal';
 
-type EditStage = 'idle' | 'signing' | 'done';
+function fmtAddr(addr: string) { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 
 function SettingRow({
   icon, iconBg, iconColor = '#1A3C2B', label, labelColor = '#1C1C1E', right,
@@ -34,106 +26,9 @@ function SettingRow({
   );
 }
 
-function NameEditor({ currentName, save, onDone }: {
-  currentName: string | null;
-  save: (name: string, sig?: string) => Promise<void>;
-  onDone: () => void;
-}) {
-  const { signMessageAsync } = useSignMessage();
-  const [input, setInput] = useState(currentName ?? '');
-  const [stage, setStage] = useState<EditStage>('idle');
-
-  const handleSave = async () => {
-    const name = input.trim();
-    if (!name) { onDone(); return; }
-
-    setStage('signing');
-
-    // Try signing — optional, never blocks the save
-    let sig: string | undefined;
-    try {
-      sig = await signMessageAsync({ message: `Rolla name: ${name}` });
-    } catch {
-      // Rejected or unavailable — save without signature
-    }
-
-    await save(name, sig);
-    setStage('done');
-    setTimeout(onDone, 700);
-  };
-
-  if (stage === 'signing') {
-    return (
-      <View className="px-5 py-6 border-b border-[#EDE6D6] items-center gap-3">
-        <ActivityIndicator color="#1A3C2B" />
-        <Text className="text-charcoal text-sm font-semibold text-center">Saving your name…</Text>
-        <Text className="text-muted text-xs text-center">If your wallet asks, tap approve — it's free</Text>
-      </View>
-    );
-  }
-
-  if (stage === 'done') {
-    return (
-      <View className="px-5 py-5 border-b border-[#EDE6D6] items-center gap-2">
-        <Ionicons name="checkmark-circle" size={28} color="#4ADE80" />
-        <Text className="text-primary font-bold text-sm">Name saved!</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View className="px-5 py-4 border-b border-[#EDE6D6]">
-      <View className="flex-row items-center gap-3 rounded-xl border border-[#D9E8E0] bg-surface px-4 py-3 mb-3">
-        <Ionicons name="person-outline" size={16} color="#6B7C74" />
-        <TextInput
-          className="flex-1 text-charcoal text-sm font-medium"
-          placeholderTextColor="#6B7C74"
-          placeholder="Your name or nickname"
-          value={input}
-          onChangeText={setInput}
-          autoCapitalize="words"
-          autoCorrect={false}
-          returnKeyType="done"
-          onSubmitEditing={handleSave}
-          autoFocus
-        />
-      </View>
-      <View className="flex-row gap-2">
-        <TouchableOpacity
-          className="flex-1 bg-primary rounded-xl py-3 items-center"
-          onPress={handleSave}
-          disabled={!input.trim()}
-          style={{ opacity: !input.trim() ? 0.4 : 1 }}
-        >
-          <Text className="text-white text-sm font-bold">Save</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="px-5 border border-[#D9E8E0] rounded-xl py-3 items-center" onPress={onDone}>
-          <Text className="text-muted text-sm font-semibold">Cancel</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 export default function ProfileTab() {
   const { address, isConnected, disconnect, connect } = useWallet();
-  const { display, name, save, clear, refetch } = useDisplayName(address);
-
-  // Re-read the name from storage every time this tab gains focus so changes
-  // saved in onboarding (or elsewhere) are always reflected immediately.
-  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
-  const {
-    hasPin, biometricEnabled, biometricType, biometricLabel,
-    enableBiometric, disableBiometric,
-  } = usePin();
-  const [editingName, setEditingName] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
-  const [showChangePin, setShowChangePin] = useState(false);
-
-  const toggleBiometric = async (value: boolean) => {
-    if (value) await enableBiometric();
-    else await disableBiometric();
-  };
 
   useEffect(() => {
     (async () => {
@@ -161,11 +56,6 @@ export default function ProfileTab() {
   const confirmDisconnect = () => Alert.alert(
     'Sign out', 'You can sign back in anytime with the same social account.',
     [{ text: 'Cancel', style: 'cancel' }, { text: 'Sign out', style: 'destructive', onPress: disconnect }],
-  );
-
-  const confirmClear = () => Alert.alert(
-    'Remove name', `Remove "${name}" from your profile?`,
-    [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: clear }],
   );
 
   if (!isConnected) {
@@ -199,46 +89,14 @@ export default function ProfileTab() {
             style={{ backgroundColor: '#D4A017' }}>
             <Ionicons name="person" size={38} color="#1A3C2B" />
           </View>
-          <Text className="text-white text-xl font-black tracking-tight">{display}</Text>
-          {name && address && (
-            <Text className="text-white/50 text-xs mt-1 font-mono">{fmtAddr(address)}</Text>
-          )}
+          <Text className="text-white text-sm font-mono mt-1 opacity-70">
+            {address ? fmtAddr(address) : ''}
+          </Text>
         </View>
 
         {/* Settings card */}
         <View className="mx-4 -mt-8 bg-white rounded-3xl overflow-hidden"
           style={{ shadowColor: '#1A3C2B', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
-
-          {editingName ? (
-            <NameEditor currentName={name} save={save} onDone={() => setEditingName(false)} />
-          ) : (
-            <TouchableOpacity onPress={() => setEditingName(true)}>
-              <SettingRow
-                icon="pencil-outline"
-                iconBg="rgba(26,60,43,0.08)"
-                label={name ? 'Change name' : 'Set a name'}
-                right={
-                  <View className="flex-row items-center gap-1.5">
-                    <Text className="text-muted text-xs" numberOfLines={1}>{name ?? 'Not set'}</Text>
-                    <Ionicons name="chevron-forward" size={14} color="#6B7C74" />
-                  </View>
-                }
-              />
-            </TouchableOpacity>
-          )}
-
-          {name && !editingName && (
-            <TouchableOpacity onPress={confirmClear}>
-              <SettingRow
-                icon="trash-outline"
-                iconBg="rgba(193,68,14,0.08)"
-                iconColor="#C1440E"
-                label="Remove name"
-                labelColor="#C1440E"
-                right={<Ionicons name="chevron-forward" size={14} color="#C1440E" />}
-              />
-            </TouchableOpacity>
-          )}
 
           <SettingRow
             icon="notifications-outline"
@@ -267,43 +125,6 @@ export default function ProfileTab() {
           </TouchableOpacity>
         </View>
 
-        {/* Security */}
-        <Text className="text-muted text-xs uppercase tracking-widest mt-6 mb-2 px-6">Security</Text>
-        <View className="mx-4 bg-white rounded-3xl overflow-hidden"
-          style={{ shadowColor: '#1A3C2B', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-
-          <TouchableOpacity onPress={() => setShowChangePin(true)}>
-            <SettingRow
-              icon="lock-closed-outline"
-              iconBg="rgba(26,60,43,0.08)"
-              label={hasPin ? 'Change PIN' : 'Set up a PIN'}
-              right={
-                <View className="flex-row items-center gap-1.5">
-                  <Text className="text-muted text-xs">{hasPin ? '••••' : 'Not set'}</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#6B7C74" />
-                </View>
-              }
-            />
-          </TouchableOpacity>
-
-          {biometricType && (
-            <SettingRow
-              icon={biometricType === 'face' ? 'scan-outline' : 'finger-print-outline'}
-              iconBg="rgba(212,160,23,0.12)"
-              iconColor="#D4A017"
-              label={biometricLabel}
-              right={
-                <Switch
-                  value={biometricEnabled}
-                  onValueChange={toggleBiometric}
-                  trackColor={{ false: '#D9E8E0', true: '#D4A017' }}
-                  thumbColor="#FFFFFF"
-                />
-              }
-            />
-          )}
-        </View>
-
         {/* Network */}
         <View className="mx-4 mt-4 bg-white rounded-3xl px-5 py-4"
           style={{ shadowColor: '#1A3C2B', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
@@ -315,12 +136,6 @@ export default function ProfileTab() {
         </View>
 
       </ScrollView>
-
-      <ChangePinModal
-        visible={showChangePin}
-        hasPin={!!hasPin}
-        onClose={() => setShowChangePin(false)}
-      />
     </SafeAreaView>
   );
 }

@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSendTransaction, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, parseUnits, isAddress } from 'viem';
 import { TOKEN_ADDRESSES } from '../constants/addresses';
-import { useAuth } from '../contexts/AuthContext';
 
 type SendToken = 'ETH' | 'USDC';
 
@@ -31,7 +30,6 @@ const ERC20_TRANSFER_ABI = [
 
 function tokenAddress(symbol: SendToken): `0x${string}` | undefined {
   if (symbol === 'USDC') return TOKEN_ADDRESSES.USDC;
-  if (symbol === 'WETH') return TOKEN_ADDRESSES.WETH;
   return undefined;
 }
 
@@ -41,7 +39,6 @@ interface Props {
 }
 
 export function SendSheet({ visible, onClose }: Props) {
-  const { requireAuth } = useAuth();
   const [token, setToken] = useState<SendToken>('ETH');
   const [to, setTo]       = useState('');
   const [amount, setAmount] = useState('');
@@ -75,9 +72,6 @@ export function SendSheet({ visible, onClose }: Props) {
 
   const handleSend = async () => {
     if (!canSend) return;
-    const authed = await requireAuth();
-    if (!authed) return;
-
     const addr = to.trim() as `0x${string}`;
     const def = TOKENS.find((t) => t.symbol === token)!;
 

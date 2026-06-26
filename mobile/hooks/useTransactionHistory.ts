@@ -18,37 +18,37 @@ export function useTransactionHistory(address: `0x${string}` | undefined) {
       const [contributions, payouts, deposits, claims, circlesCreated, circlesJoined] = await Promise.all([
         client.getLogs({
           address: CONTRACT_ADDRESSES.AJO_CIRCLE,
-          event: (AJO_CIRCLE_ABI as any[]).find((e) => e.name === 'ContributionMade'),
+          event: (AJO_CIRCLE_ABI as unknown as any[]).find((e) => e.name === 'ContributionMade'),
           args: { member: address },
           fromBlock,
         }).catch(() => []),
         client.getLogs({
           address: CONTRACT_ADDRESSES.AJO_CIRCLE,
-          event: (AJO_CIRCLE_ABI as any[]).find((e) => e.name === 'PayoutReleased'),
+          event: (AJO_CIRCLE_ABI as unknown as any[]).find((e) => e.name === 'PayoutReleased'),
           args: { recipient: address },
           fromBlock,
         }).catch(() => []),
         client.getLogs({
           address: CONTRACT_ADDRESSES.ROLLA_VAULT,
-          event: (ROLLA_VAULT_ABI as any[]).find((e) => e.name === 'VaultCreated'),
+          event: (ROLLA_VAULT_ABI as unknown as any[]).find((e) => e.name === 'VaultCreated'),
           args: { owner: address },
           fromBlock,
         }).catch(() => []),
         client.getLogs({
           address: CONTRACT_ADDRESSES.ROLLA_VAULT,
-          event: (ROLLA_VAULT_ABI as any[]).find((e) => e.name === 'VaultClaimed'),
+          event: (ROLLA_VAULT_ABI as unknown as any[]).find((e) => e.name === 'VaultClaimed'),
           args: { owner: address },
           fromBlock,
         }).catch(() => []),
         client.getLogs({
           address: CONTRACT_ADDRESSES.AJO_CIRCLE,
-          event: (AJO_CIRCLE_ABI as any[]).find((e) => e.name === 'CircleCreated'),
+          event: (AJO_CIRCLE_ABI as unknown as any[]).find((e) => e.name === 'CircleCreated'),
           args: { creator: address },
           fromBlock,
         }).catch(() => []),
         client.getLogs({
           address: CONTRACT_ADDRESSES.AJO_CIRCLE,
-          event: (AJO_CIRCLE_ABI as any[]).find((e) => e.name === 'MemberJoined'),
+          event: (AJO_CIRCLE_ABI as unknown as any[]).find((e) => e.name === 'MemberJoined'),
           args: { member: address },
           fromBlock,
         }).catch(() => []),

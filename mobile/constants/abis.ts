@@ -199,7 +199,9 @@ export const USERNAME_REGISTRY_ABI = [
     inputs: [{ name: 'owner', type: 'address', indexed: true }, { name: 'name', type: 'string', indexed: false }] },
   { type: 'event', name: 'Released',
     inputs: [{ name: 'owner', type: 'address', indexed: true }, { name: 'name', type: 'string', indexed: false }] },
-  { type: 'error', name: 'NameTaken',    inputs: [] },
-  { type: 'error', name: 'InvalidName',  inputs: [] },
-  { type: 'error', name: 'NoName',       inputs: [] },
+  { type: 'error', name: 'NameTaken',      inputs: [] },
+  { type: 'error', name: 'InvalidName',    inputs: [] },
+  { type: 'error', name: 'NoName',         inputs: [] },
+  { type: 'error', name: 'CooldownActive', inputs: [{ name: 'cooldownEnds', type: 'uint256' }] },
+  { type: 'error', name: 'Unauthorized',   inputs: [] },
 ] as const;

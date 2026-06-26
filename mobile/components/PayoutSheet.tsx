@@ -9,7 +9,6 @@ import { TOKEN_ADDRESSES } from '../constants/addresses';
 const TOKENS = [
   { symbol: 'USDC', address: TOKEN_ADDRESSES.USDC, decimals: 6, icon: 'cash-outline' as const },
   { symbol: 'ETH',  address: '0x0000000000000000000000000000000000000000' as `0x${string}`, decimals: 18, icon: 'logo-bitcoin' as const },
-  { symbol: 'WETH', address: TOKEN_ADDRESSES.WETH, decimals: 18, icon: 'cube-outline' as const },
 ] as const;
 
 const SLIPPAGE_OPTIONS = [0.5, 1, 2];

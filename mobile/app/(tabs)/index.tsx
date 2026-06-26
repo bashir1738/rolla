@@ -10,7 +10,6 @@ import { ProfileButton } from '../../components/ProfileSidebar';
 import { useProfileSidebar } from '../../contexts/ProfileSidebarContext';
 import { useCircles, type CircleData } from '../../hooks/useCircles';
 import { useWallet } from '../../providers/WalletContext';
-import { useDisplayName } from '../../hooks/useDisplayName';
 import { useRefresh } from '../../hooks/useRefresh';
 import { useFundWallet } from '../../hooks/useFundWallet';
 
@@ -21,7 +20,6 @@ function fmtUSDC(n: bigint) {
 export default function HomeTab() {
   const router = useRouter();
   const { isConnected, connect, address } = useWallet();
-  const { display } = useDisplayName(address);
   const { circles, isLoading } = useCircles();
   const { openSidebar } = useProfileSidebar();
   const { refreshing, refresh } = useRefresh();
@@ -30,6 +28,7 @@ export default function HomeTab() {
 
   // Auto-fund wallet if balance is low
   useFundWallet(address);
+
 
   const totalSaved = circles.reduce((s, c) => s + c.poolBalance, 0n);
   const pendingPayouts = circles.filter((c) => c.payoutPending && c.myPosition === c.currentRound);
@@ -45,9 +44,6 @@ export default function HomeTab() {
             <Ionicons name="leaf" size={15} color="#1A3C2B" />
           </View>
           <Text className="text-white font-semibold text-xl tracking-tight">Rolla</Text>
-          {display ? (
-            <Text className="text-white/50 text-sm font-medium">· {display}</Text>
-          ) : null}
         </View>
         <View className="flex-row items-center gap-2">
           <WalletButton />
@@ -157,9 +153,11 @@ export default function HomeTab() {
             </TouchableOpacity>
           </View>
         ) : (
-          circles.map((c) => (
-            <CircleCard key={c.id} circle={c} onPress={() => setSelected(c)} />
-          ))
+          [...circles]
+            .sort((a, b) => Number(b.id - a.id)) // Latest circles first
+            .map((c) => (
+              <CircleCard key={c.id} circle={c} onPress={() => setSelected(c)} />
+            ))
         )}
 
         {/* Vault teaser */}

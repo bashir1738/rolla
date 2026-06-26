@@ -17,8 +17,6 @@ import { WalletProvider } from '../providers/WalletContext';
 import { LoginSheet } from '../components/LoginSheet';
 import { ProfileSidebar } from '../components/ProfileSidebar';
 import { ProfileSidebarProvider, useProfileSidebar } from '../contexts/ProfileSidebarContext';
-import { AuthProvider } from '../contexts/AuthContext';
-import { AuthGate } from '../components/AuthGate';
 import { useNotifications } from '../hooks/useNotifications';
 import { magic } from '../lib/magicClient';
 
@@ -66,12 +64,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <WagmiQueryProvider>
         <WalletProvider>
-          <AuthProvider>
-            <ProfileSidebarProvider>
-              <AppContent />
-            </ProfileSidebarProvider>
-            <AuthGate />
-          </AuthProvider>
+          <ProfileSidebarProvider>
+            <AppContent />
+          </ProfileSidebarProvider>
         </WalletProvider>
       </WagmiQueryProvider>
       <magic.Relayer />

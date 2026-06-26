@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSignMessage } from 'wagmi';
 import { useWallet } from '../../providers/WalletContext';
 import { useDisplayName } from '../../hooks/useDisplayName';
 
@@ -16,11 +15,11 @@ type Stage = 'loading' | 'input' | 'saving' | 'done';
 export default function NameSetup() {
   const router = useRouter();
   const { address } = useWallet();
-  const { name: existingName, loaded, save } = useDisplayName(address);
-  const { signMessageAsync } = useSignMessage();
+  const { name: existingName, loaded, saveLocal } = useDisplayName(address);
 
   const [input, setInput] = useState('');
   const [stage, setStage] = useState<Stage>('loading');
+  const [error, setError] = useState('');
   const stageRef = useRef<Stage>('loading');
   const syncStage = (s: Stage) => { stageRef.current = s; setStage(s); };
 
@@ -35,19 +34,24 @@ export default function NameSetup() {
   }, [loaded, existingName]);
 
   const handleSave = async () => {
-    const name = input.trim();
-    if (!name) return;
+    const name = input.trim().toLowerCase();
+    if (!name || !address) return;
     Keyboard.dismiss();
     syncStage('saving');
+    setError('');
 
-    let sig: string | undefined;
     try {
-      sig = await signMessageAsync({ message: `Rolla name: ${name}` });
-    } catch {}
+      await saveLocal(name);
 
-    await save(name, sig);
-    syncStage('done');
-    setTimeout(() => router.replace('/(tabs)'), 1200);
+      syncStage('done');
+      // Go to PIN setup after name is saved
+      setTimeout(() => router.replace('/onboarding/pin'), 1200);
+    } catch (e: any) {
+      console.error('Name save error:', e);
+      const msg = e?.message || String(e);
+      setError(`Error: ${msg.slice(0, 80)}`);
+      syncStage('input');
+    }
   };
 
   return (
@@ -70,10 +74,10 @@ export default function NameSetup() {
             <View className="items-center gap-4">
               <ActivityIndicator size="large" color="#1A3C2B" />
               <Text className="text-charcoal font-semibold text-lg text-center">
-                Saving your name
+                Setting up your profile
               </Text>
               <Text className="text-muted text-sm text-center">
-                Securing it to your account — this is free.
+                Your name will be saved and ready to use.
               </Text>
             </View>
           )}
@@ -99,22 +103,26 @@ export default function NameSetup() {
                 What should we{'\n'}call you?
               </Text>
               <Text className="text-muted text-base mb-8 leading-relaxed">
-                This is what your circle will see.
+                Your Rolla name — make it memorable. You can claim it on-chain anytime later.
               </Text>
 
               <TextInput
-                className="text-charcoal text-base font-medium bg-white px-4 py-4 rounded-2xl mb-8"
-                style={{ borderWidth: 1, borderColor: '#D9E8E0' }}
+                className="text-charcoal text-base font-medium bg-white px-4 py-4 rounded-2xl mb-4"
+                style={{ borderWidth: 1, borderColor: error ? '#EF4444' : '#D9E8E0' }}
                 placeholderTextColor="#6B7C74"
-                placeholder="Your name or nickname"
+                placeholder="yourname"
                 value={input}
-                onChangeText={setInput}
-                autoCapitalize="words"
+                onChangeText={(text) => { setInput(text); setError(''); }}
+                autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="done"
                 onSubmitEditing={handleSave}
                 autoFocus
               />
+
+              {error && (
+                <Text className="text-red-600 text-sm mb-4 font-medium">{error}</Text>
+              )}
 
               <TouchableOpacity
                 className="bg-primary rounded-full py-4 items-center flex-row justify-center gap-2"

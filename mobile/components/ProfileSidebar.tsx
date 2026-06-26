@@ -1,21 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Animated, TouchableOpacity, Dimensions,
-  TouchableWithoutFeedback, ScrollView, Switch, Alert,
-  TextInput, ActivityIndicator, StyleSheet,
+  TouchableWithoutFeedback, ScrollView, Switch, Alert, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useSignMessage, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { waitForTransactionReceipt } from '@wagmi/core';
 import { useWallet } from '../providers/WalletContext';
-import { useDisplayName, fmtAddr } from '../hooks/useDisplayName';
-import { useAuth } from '../contexts/AuthContext';
-import { PinPad } from './PinPad';
-import { CONTRACT_ADDRESSES } from '../constants/addresses';
-import { USERNAME_REGISTRY_ABI } from '../constants/abis';
-import { wagmiConfig } from '../providers/WagmiProvider';
 
 // expo-notifications is unavailable in Expo Go SDK 53+
 const IN_EXPO_GO = Constants.appOwnership === 'expo';
@@ -42,200 +33,7 @@ function SidebarRow({
   );
 }
 
-function NameEditor({ currentName, save, onDone }: {
-  currentName: string | null;
-  save: (name: string, sig?: string) => Promise<void>;
-  onDone: () => void;
-}) {
-  const { writeContractAsync } = useWriteContract();
-  const [input, setInput] = useState(currentName ?? '');
-  const [stage, setStage] = useState<EditStage>('idle');
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSave = async () => {
-    const name = input.trim();
-    if (!name) { onDone(); return; }
-    setStage('signing');
-    setError(null);
-    try {
-      // Register name on-chain so all users can see it on circles
-      const hash = await writeContractAsync({
-        address: CONTRACT_ADDRESSES.USERNAME_REGISTRY,
-        abi: USERNAME_REGISTRY_ABI,
-        functionName: 'claim',
-        args: [name],
-      });
-      await waitForTransactionReceipt(wagmiConfig, { hash });
-      await save(name); // also cache locally
-      setStage('done');
-      setTimeout(onDone, 900);
-    } catch (e: any) {
-      const msg: string = e?.message ?? '';
-      if (msg.includes('NameTaken')) {
-        setError('That name is already taken — try another.');
-      } else if (msg.includes('CooldownActive')) {
-        setError('You changed your name recently. Try again in 24h.');
-      } else if (msg.includes('InvalidName')) {
-        setError('Only letters, numbers, hyphens and underscores (max 32 chars).');
-      } else {
-        setError('Transaction failed. Name saved locally only.');
-        await save(name);
-      }
-      setStage('idle');
-    }
-  };
-
-  if (stage === 'signing') {
-    return (
-      <View style={styles.editorCenter}>
-        <ActivityIndicator color="#1A3C2B" />
-        <Text style={styles.editorTitle}>Claiming name on-chain…</Text>
-        <Text style={styles.editorSub}>Approve in your wallet — one-time gas fee</Text>
-      </View>
-    );
-  }
-  if (stage === 'done') {
-    return (
-      <View style={[styles.editorCenter, { paddingVertical: 20 }]}>
-        <Ionicons name="checkmark-circle" size={28} color="#4ADE80" />
-        <Text style={[styles.editorTitle, { color: '#1A3C2B' }]}>Name saved!</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={styles.editorWrap}>
-      <View style={[styles.editorInput, error ? { borderColor: '#C1440E' } : {}]}>
-        <Ionicons name="person-outline" size={16} color="#6B7C74" />
-        <TextInput
-          style={styles.editorText}
-          placeholderTextColor="#6B7C74"
-          placeholder="Your name or nickname"
-          value={input}
-          onChangeText={(t) => { setInput(t); setError(null); }}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="done"
-          onSubmitEditing={handleSave}
-          autoFocus
-        />
-      </View>
-      {error ? (
-        <Text style={{ color: '#C1440E', fontSize: 11, marginTop: 4, marginBottom: -4 }}>{error}</Text>
-      ) : (
-        <Text style={{ color: '#6B7C74', fontSize: 11, marginTop: 4, marginBottom: -4 }}>
-          Visible to all users on circles · letters, numbers, - and _ only
-        </Text>
-      )}
-      <View style={styles.editorActions}>
-        <TouchableOpacity
-          style={[styles.editorSave, { opacity: !input.trim() ? 0.4 : 1 }]}
-          onPress={handleSave}
-          disabled={!input.trim()}
-        >
-          <Text style={styles.editorSaveText}>Save</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.editorCancel} onPress={onDone}>
-          <Text style={styles.editorCancelText}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-// ── PIN Editor ────────────────────────────────────────────────────────────────
-
-type PinStep = 'verify' | 'enter' | 'confirm' | 'done';
-
-function PinEditor({ hasPin, onDone }: { hasPin: boolean; onDone: () => void }) {
-  const { verifyPin, setupPin } = useAuth();
-  const [step, setStep]       = useState<PinStep>(hasPin ? 'verify' : 'enter');
-  const [old, setOld]         = useState('');
-  const [next, setNext]       = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [error, setError]     = useState(false);
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-
-  const shake = () => {
-    setError(true);
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 8,  duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 5,  duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0,  duration: 55, useNativeDriver: true }),
-    ]).start(() => setError(false));
-  };
-
-  const onKey = async (key: string) => {
-    const update = (cur: string): string => {
-      if (key === '⌫') return cur.slice(0, -1);
-      if (cur.length >= 4) return cur;
-      return cur + key;
-    };
-
-    if (step === 'verify') {
-      const val = update(old);
-      setOld(val);
-      if (val.length === 4) {
-        const ok = await verifyPin(val);
-        if (ok) { setTimeout(() => { setOld(''); setStep('enter'); }, 150); }
-        else    { shake(); setTimeout(() => setOld(''), 500); }
-      }
-    } else if (step === 'enter') {
-      const val = update(next);
-      setNext(val);
-      if (val.length === 4) setTimeout(() => setStep('confirm'), 150);
-    } else if (step === 'confirm') {
-      const val = update(confirm);
-      setConfirm(val);
-      if (val.length === 4) {
-        if (val === next) {
-          await setupPin(next);
-          setStep('done');
-          setTimeout(onDone, 900);
-        } else {
-          shake();
-          setTimeout(() => setConfirm(''), 500);
-        }
-      }
-    }
-  };
-
-  const TITLES: Record<PinStep, string> = {
-    verify:  'Enter current PIN',
-    enter:   hasPin ? 'Enter new PIN' : 'Create your PIN',
-    confirm: 'Confirm new PIN',
-    done:    'PIN saved!',
-  };
-
-  const activeValue = step === 'verify' ? old : step === 'enter' ? next : confirm;
-
-  if (step === 'done') {
-    return (
-      <View style={{ alignItems: 'center', paddingVertical: 24, gap: 10 }}>
-        <Ionicons name="checkmark-circle" size={38} color="#4ADE80" />
-        <Text style={{ color: '#1A3C2B', fontWeight: '700', fontSize: 15 }}>PIN updated!</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ paddingTop: 12, paddingBottom: 8 }}>
-      <Text style={{ fontSize: 13, fontWeight: '700', color: '#1C1C1E', textAlign: 'center', marginBottom: 18 }}>
-        {TITLES[step]}
-      </Text>
-      <PinPad
-        length={4}
-        value={activeValue}
-        onKey={onKey}
-        error={error}
-        shakeAnim={shakeAnim}
-      />
-      <TouchableOpacity onPress={onDone} style={{ marginTop: 14, alignItems: 'center' }}>
-        <Text style={{ color: '#6B7C74', fontSize: 13 }}>Cancel</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+function fmtAddr(addr: string) { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 
 interface Props {
   visible: boolean;
@@ -248,10 +46,6 @@ export function ProfileSidebar({ visible, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
 
   const { address, isConnected, disconnect, connect } = useWallet();
-  const { display, name, save, clear } = useDisplayName(address);
-  const { isSetup: pinSetup } = useAuth();
-  const [editingName, setEditingName] = useState(false);
-  const [editingPin, setEditingPin]   = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
 
   useEffect(() => {
@@ -309,10 +103,6 @@ export function ProfileSidebar({ visible, onClose }: Props) {
     ],
   );
 
-  const confirmClear = () => Alert.alert(
-    'Remove name', `Remove "${name}" from your profile?`,
-    [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: clear }],
-  );
 
   if (!mounted) return null;
 
@@ -332,12 +122,9 @@ export function ProfileSidebar({ visible, onClose }: Props) {
               <View style={styles.avatar}>
                 <Ionicons name="person" size={20} color="#1A3C2B" />
               </View>
-              <View>
-                <Text style={styles.displayName} numberOfLines={1}>{display}</Text>
-                {address && (
-                  <Text style={styles.addrText} numberOfLines={1}>{fmtAddr(address)}</Text>
-                )}
-              </View>
+              <Text style={styles.addrText} numberOfLines={1}>
+                {address ? fmtAddr(address) : 'Wallet'}
+              </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={18} color="#6B7C74" />
@@ -357,36 +144,8 @@ export function ProfileSidebar({ visible, onClose }: Props) {
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-              <Text style={styles.sectionLabel}>Profile</Text>
+              <Text style={styles.sectionLabel}>Settings</Text>
               <View style={styles.card}>
-                {editingName ? (
-                  <NameEditor currentName={name} save={save} onDone={() => setEditingName(false)} />
-                ) : (
-                  <TouchableOpacity onPress={() => setEditingName(true)}>
-                    <SidebarRow
-                      icon="pencil-outline"
-                      iconBg="rgba(26,60,43,0.08)"
-                      label={name ? 'Change name' : 'Set a name'}
-                      right={
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Text style={styles.rowMeta} numberOfLines={1}>{name ?? 'Not set'}</Text>
-                          <Ionicons name="chevron-forward" size={14} color="#6B7C74" />
-                        </View>
-                      }
-                    />
-                  </TouchableOpacity>
-                )}
-
-                {name && !editingName && (
-                  <TouchableOpacity onPress={confirmClear}>
-                    <SidebarRow
-                      icon="trash-outline" iconBg="rgba(193,68,14,0.08)" iconColor="#C1440E"
-                      label="Remove name" labelColor="#C1440E"
-                      right={<Ionicons name="chevron-forward" size={14} color="#C1440E" />}
-                    />
-                  </TouchableOpacity>
-                )}
-
                 <SidebarRow
                   icon="notifications-outline" iconBg="rgba(212,160,23,0.12)" iconColor="#D4A017"
                   label="Push Notifications"
@@ -395,7 +154,6 @@ export function ProfileSidebar({ visible, onClose }: Props) {
                       trackColor={{ false: '#D9E8E0', true: '#D4A017' }} thumbColor="#FFF" />
                   }
                 />
-
                 <TouchableOpacity onPress={confirmDisconnect}>
                   <SidebarRow
                     icon="log-out-outline" iconBg="rgba(193,68,14,0.10)" iconColor="#C1440E"
@@ -403,27 +161,6 @@ export function ProfileSidebar({ visible, onClose }: Props) {
                     right={<Ionicons name="chevron-forward" size={16} color="#C1440E" />}
                   />
                 </TouchableOpacity>
-              </View>
-
-              <Text style={styles.sectionLabel}>Security</Text>
-              <View style={styles.card}>
-                {editingPin ? (
-                  <PinEditor hasPin={pinSetup} onDone={() => setEditingPin(false)} />
-                ) : (
-                  <TouchableOpacity onPress={() => setEditingPin(true)}>
-                    <SidebarRow
-                      icon="lock-closed-outline"
-                      iconBg="rgba(26,60,43,0.08)"
-                      label={pinSetup ? 'Change PIN' : 'Create PIN'}
-                      right={
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Text style={styles.rowMeta}>{pinSetup ? '••••' : 'Not set'}</Text>
-                          <Ionicons name="chevron-forward" size={14} color="#6B7C74" />
-                        </View>
-                      }
-                    />
-                  </TouchableOpacity>
-                )}
               </View>
 
               <Text style={styles.sectionLabel}>Network</Text>
