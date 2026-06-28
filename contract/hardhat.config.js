@@ -50,8 +50,7 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: {
-      sepolia: process.env.ETHERSCAN_API_KEY || "",
-    },
+    // Single key + Etherscan API V2 (multichain) endpoint.
+    apiKey: process.env.ETHERSCAN_API_KEY || "",
   },
 };
